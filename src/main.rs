@@ -47,6 +47,10 @@ fn main() {
     HttpServer::new(move || {
         App::new()
             .service(api::get_service())
+            .service(
+                actix_files::Files::new("/", "public/.")
+                    .index_file("index.html")
+            )
             .register_data(state.clone())
             .route("/", web::get().to(index))
     })

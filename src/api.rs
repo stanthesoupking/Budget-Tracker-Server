@@ -16,6 +16,8 @@ pub fn get_service() -> Scope {
         .route("/delete/budget", web::post().to(delete_budget))
         .route("/get/budget", web::post().to(get_budget))
         .route("/list/can_access_budget", web::post().to(list_can_access_budget))
+        .route("/add/can_access_budget", web::post().to(add_can_access_budget))
+        .route("/delete/can_access_budget", web::post().to(delete_can_access_budget))
 }
 
 // API Routes
@@ -219,6 +221,42 @@ fn list_can_access_budget(data: web::Data<AppState>, json: web::Json<SelectForm>
                 error
             ))),
             users: None,
+        }),
+    }
+}
+
+fn add_can_access_budget(data: web::Data<AppState>, json: web::Json<CanAccessBudgetForm>) -> impl Responder {
+    let database = data.database.lock().unwrap();
+
+    let res = database.add_can_access_budget(&json.access_token, json.budget_id, &json.username);
+
+    match res {
+        Ok(_) => web::Json(StatusResult {
+            status: ResultStatus::Success
+        }),
+        Err(error) => web::Json(StatusResult {
+            status: ResultStatus::Error(String::from(format!(
+                "Error occurred giving budget access: {:?}",
+                error
+            )))
+        }),
+    }
+}
+
+fn delete_can_access_budget(data: web::Data<AppState>, json: web::Json<CanAccessBudgetForm>) -> impl Responder {
+    let database = data.database.lock().unwrap();
+
+    let res = database.delete_can_access_budget(&json.access_token, json.budget_id, &json.username);
+
+    match res {
+        Ok(_) => web::Json(StatusResult {
+            status: ResultStatus::Success
+        }),
+        Err(error) => web::Json(StatusResult {
+            status: ResultStatus::Error(String::from(format!(
+                "Error occurred giving budget access: {:?}",
+                error
+            )))
         }),
     }
 }

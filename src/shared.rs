@@ -50,6 +50,13 @@ pub struct AddBudgetForm {
     pub budget_period_length: i64
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CanAccessBudgetForm {
+    pub access_token: String,
+    pub budget_id: i64,
+    pub username: String
+}
+
 // --- RESULTS
 
 #[derive(Debug, Serialize, Deserialize)]

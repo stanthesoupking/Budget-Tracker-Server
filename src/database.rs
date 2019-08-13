@@ -8,7 +8,7 @@ use std::io;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, params, NO_PARAMS};
 use rusqlite::Error::SqliteFailure;
 
 use termion::input::TermRead;
@@ -22,6 +22,7 @@ pub enum Error {
     UpdateEntryMissingID,
     InvalidCredentials,
     UserDeniedError,
+    AccessRecursionError,
     SqliteError(libsqlite3_sys::Error, Option<String>),
     UnknownError
 }
@@ -49,6 +50,10 @@ impl Database {
             Ok(conn) => conn,
             Err(_) => return Err(Error::LoadFileError)
         };
+
+        // Enable foreign key support
+        db_conn.execute("PRAGMA foreign_keys = ON", NO_PARAMS)
+            .expect("Failed enabling foreign key support.");
 
         let database = Database {
             secret,
@@ -128,7 +133,8 @@ impl Database {
 
             CREATE TABLE can_access_budget (
                 budget_id INTEGER NOT NULL,
-                username INTEGER NOT NULL,
+                username TEXT NOT NULL,
+                PRIMARY KEY(budget_id, username),
                 FOREIGN KEY(budget_id) REFERENCES budgets(budget_id),
                 FOREIGN KEY(username) REFERENCES users(username)
             );
@@ -448,6 +454,99 @@ impl Database {
             Ok(result)
         } else {
             Err(Error::UserDeniedError)
+        }
+    }
+
+    pub fn add_can_access_budget(&self, access_token: &str, budget_id: i64,
+        username: &str) -> Result<(), Error> {
+
+        // Get current user
+        let user = match self.get_user_by_access_token(access_token) {
+            Ok(user) => match user {
+                Some(user) => user,
+                None => return Err(Error::InvalidCredentials)
+            },
+            Err(error) => return Err(error)
+        };
+
+        // Get budget
+        let budget = match self.get_budget(budget_id) {
+            Ok(budget) => match budget {
+                Some(budget) => budget,
+                None => return Err(Error::EntryNotFound)
+            },
+            Err(error) => return Err(error)
+        };
+
+        // Check if the current user is the budget owner
+        match budget.owner {
+            Some(owner) => {
+                if !owner.eq(&user.username) {
+                    return Err(Error::UserDeniedError);
+                }
+            },
+            None => return Err(Error::UnknownError)
+        };
+
+        // Check if the request is trying to give owner access to their own budget
+        if username.eq(&user.username) {
+            return Err(Error::AccessRecursionError);
+        }
+
+        let res = self.db_conn.execute(
+            "INSERT INTO can_access_budget(
+                budget_id, username
+            )
+            VALUES(?1, ?2)",
+            params![budget_id, username]);
+
+        match res {
+            Ok(_) => Ok(()),
+            Err(error) => match error {
+                SqliteFailure(error, desc) => Err(Error::SqliteError(error, desc)),
+                _ => Err(Error::UnknownError)
+            }
+        }
+    }
+
+    pub fn delete_can_access_budget(&self, access_token: &str, budget_id: i64, username: &str) -> Result<(), Error> {
+        let user = match self.get_user_by_access_token(access_token) {
+            Ok(user) => match user {
+                Some(user) => user,
+                None => return Err(Error::InvalidCredentials)
+            },
+            Err(error) => return Err(error)
+        };
+
+        // Get budget
+        let budget = self.get_budget(budget_id)?;
+
+        match budget {
+            Some(budget) => {
+                let owner = match budget.owner {
+                    Some(id) => id,
+                    None => return Err(Error::UnknownError)
+                };
+
+                // Check if user is the budget owner
+                if owner != user.username {
+                    return Err(Error::UserDeniedError);
+                }
+
+                // Perform deletion
+                let res = self.db_conn.execute(
+                    "DELETE FROM can_access_budget WHERE budget_id = ?1 AND username = ?2",
+                    params![budget_id, username]);
+                
+                match res {
+                    Ok(_) => Ok(()),
+                    Err(error) => match error {
+                        SqliteFailure(error, desc) => Err(Error::SqliteError(error, desc)),
+                        _ => Err(Error::UnknownError)
+                    }
+                }
+            },
+            None => Err(Error::EntryNotFound)
         }
     }
 
