@@ -1,0 +1,17 @@
+[package]
+name = "budget-tracker-server"
+version = "0.1.0"
+authors = ["Stanley Fuller <stanthesoupking@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+#sqlite = "0.25.0"
+actix-web = "1.0"
+json = "0.11"
+serde = { version = "1.0", features = ["derive"] }
+rust-crypto = "0.2.36"
+rusqlite = "0.20.0"
+libsqlite3-sys = "0.16.0"
+termion = "1.5.3"
