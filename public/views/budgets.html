@@ -1,0 +1,109 @@
+<div>
+    <nav class="navbar navbar-dark bg-primary">
+        <a class="navbar-brand" href="#">Budget Tracker Server</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavAltMarkup"
+            aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse text-right" id="navbarNavAltMarkup">
+            <div class="navbar-nav">
+                <a class="nav-item nav-link active">Overview <span class="sr-only">(current)</span></a>
+                <a class="nav-item nav-link">Account</a>
+                <a id="logoutButton" class="nav-item nav-link">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h2>Budgets</h2>
+        <button class="btn btn-success" data-toggle="modal" data-target="#new-budget-modal">Create Budget</button>
+        <div class="overview-budgets mt-3">
+            Loading...
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal fade" id="new-budget-modal" tabindex="-1" role="dialog" aria-labelledby="new-budget-modal-title"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="new-budget-modal-title">Create Budget</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form id="new-budget-modal-form">
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="budget-name" class="col-form-label">Name:</label>
+                            <input type="text" class="form-control" id="budget-name">
+                        </div>
+                        <div class="form-group">
+                            <label for="budget-spending-limit" class="col-form-label">Spending Limit:</label>
+                            <input type="number" class="form-control" id="budget-spending-limit" value="500">
+                        </div>
+                        <div class="form-group">
+                            <label for="budget-period-length" class="col-form-label">Period Length (days):</label>
+                            <input type="number" class="form-control" id="budget-period-length" value="7">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <input type="submit" class="btn btn-primary" value="Create"></input>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(() => {
+        budgetCardTemplate = loadTemplate('budget-card');
+
+        $("#logoutButton").on("click", () => {
+            clearAccessTokenCookie();
+            loadView('login');
+        });
+
+        $("#new-budget-modal-form").on("submit", (e) => {
+            e.preventDefault();
+
+            let budgetName = $("#new-budget-modal-form #budget-name").val();
+            let budgetSpendLimit = $("#new-budget-modal-form #budget-spending-limit").val();
+            let budgetPeriodLength = $("#new-budget-modal-form #budget-period-length").val();
+
+            createBudget(accessToken, budgetName, budgetSpendLimit, budgetPeriodLength).done((data) => {
+                if (data.status == "Success") {
+                    displayToast("budget-create-success");
+                    reloadView();
+                    $("#new-budget-modal").modal('hide');
+                } else {
+                    displayToast("budget-create-fail");
+                    $("#new-budget-modal").modal('hide');
+                }
+            });
+        });
+
+        // Get budgets
+        getBudgets(accessToken).done((data) => {
+            if (data.status == "Success") {
+                $(".overview-budgets").html("Your budgets");
+                for (let budget of data.budgets) {
+                    let card = $(budgetCardTemplate);
+
+                    card.find("#title").html(budget.name);
+
+                    card.on("click", () => {
+                        window.location.hash = "transactions:" + budget.budget_id;
+                    })
+
+                    $(".overview-budgets").append(card);
+                }
+            } else {
+
+            }
+        });
+    });
+</script>

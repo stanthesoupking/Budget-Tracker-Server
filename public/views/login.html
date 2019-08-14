@@ -1,0 +1,33 @@
+<div class="text-center">
+    <form class="form-signin">
+        <img class="mb-4" src="/svg/logo.svg" alt="" width="72" height="72">
+        <h1 class="h3 mb-3">Budget Tracker Server</h1>
+        <h1 class="h4 mb-3 font-weight-normal">Please sign in</h1>
+        <label for="inputUsername" class="sr-only">Username</label>
+        <input type="text" id="inputUsername" class="form-control" placeholder="Username" required autofocus>
+        <label for="inputPassword" class="sr-only">Password</label>
+        <input type="password" id="inputPassword" class="form-control" placeholder="Password" required>
+        <button class="btn btn-lg btn-primary btn-block" type="submit">Sign in</button>
+        <p class="mt-5 mb-3 text-muted">&copy; 2019 Stanley Fuller</p>
+    </form>
+</div>
+
+<script>
+    $(".form-signin").on("submit", (e) => {
+        e.preventDefault();
+
+        let username = $("#inputUsername").val();
+        let password = $("#inputPassword").val();
+
+        getAccessToken(username, password)
+            .done((data) => {
+                if (data.status == 'Success') {
+                    setAccessTokenCookie(data.access_token);
+                    displayToast('login-success');
+                    loadView('overview');
+                } else {
+                    displayToast('login-fail');
+                }
+            });
+    });
+</script>

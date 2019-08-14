@@ -147,7 +147,7 @@ fn list_budgets(data: web::Data<AppState>, json: web::Json<AccessTokenForm>) -> 
 fn add_budget(data: web::Data<AppState>, json: web::Json<AddBudgetForm>) -> impl Responder {
     let database = data.database.lock().unwrap();
 
-    let budget = Budget::new(json.budget_name.clone(), json.budget_period_length);
+    let budget = Budget::new(json.budget_name.clone(), json.budget_spend_limit, json.budget_period_length);
 
     let res = database.add_budget(&json.access_token, &budget);
 

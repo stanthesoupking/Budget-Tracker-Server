@@ -47,6 +47,7 @@ pub struct SelectForm {
 pub struct AddBudgetForm {
     pub access_token: String,
     pub budget_name: String,
+    pub budget_spend_limit: f64,
     pub budget_period_length: i64
 }
 

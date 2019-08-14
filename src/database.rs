@@ -127,6 +127,7 @@ impl Database {
                 budget_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 owner TEXT NOT NULL,
                 name TEXT NOT NULL,
+                spend_limit FLOAT NOT NULL,
                 period_length INTEGER NOT NULL,
                 FOREIGN KEY(owner) REFERENCES users(username)
             );
@@ -271,7 +272,7 @@ impl Database {
 
     pub fn get_available_budgets(&self, access_token: &str) -> Result<Vec<Budget>, Error> {
         let mut stmt = self.db_conn.prepare(
-            "SELECT budget_id, owner, name, period_length FROM budgets WHERE budget_id in (
+            "SELECT budget_id, owner, name, spend_limit, period_length FROM budgets WHERE budget_id in (
             SELECT budget_id FROM (SELECT budget_id, owner AS username FROM budgets
             UNION SELECT budget_id, username FROM can_access_budget) WHERE username in
             (SELECT username FROM users WHERE access_token = ?1))"
@@ -284,7 +285,8 @@ impl Database {
                 budget_id: row.get(0)?,
                 owner: row.get(1)?,
                 name: row.get(2)?,
-                period_length: row.get(3)?,
+                spend_limit: row.get(3)?,
+                period_length: row.get(4)?,
             })
         });
 
@@ -306,10 +308,10 @@ impl Database {
 
         let res = self.db_conn.execute(
             "INSERT INTO budgets(
-                owner, name, period_length
+                owner, name, spend_limit, period_length
             )
-            VALUES(?1, ?2, ?3)",
-            params![user.username, budget.name, budget.period_length]);
+            VALUES(?1, ?2, ?3, ?4)",
+            params![user.username, budget.name, budget.spend_limit, budget.period_length]);
 
         match res {
             Ok(_) => {
@@ -318,6 +320,7 @@ impl Database {
                     budget_id: Some(budget_id),
                     owner: Some(user.username),
                     name: budget.name.clone(),
+                    spend_limit: budget.spend_limit,
                     period_length: budget.period_length
                 })
             },
@@ -331,7 +334,7 @@ impl Database {
     pub fn get_budget(&self, budget_id: i64) -> Result<Option<Budget>, Error> {
         // Get budget
         let mut stmt = self.db_conn.prepare(
-            "SELECT budget_id, owner, name, period_length FROM budgets
+            "SELECT budget_id, owner, name, spend_limit, period_length FROM budgets
             WHERE budget_id = ?1"
         )?;
 
@@ -340,7 +343,8 @@ impl Database {
                 budget_id: row.get(0)?,
                 owner: row.get(1)?,
                 name: row.get(2)?,
-                period_length: row.get(3)?,
+                spend_limit: row.get(3)?,
+                period_length: row.get(4)?,
             })
         }) {
             Ok(budget) => Ok(Some(budget)),
@@ -354,7 +358,7 @@ impl Database {
     pub fn get_available_budget(&self, access_token: &str, budget_id: i64) -> Result<Option<Budget>, Error> {
         // Get available budget
         let mut stmt = self.db_conn.prepare(
-            "SELECT budget_id, owner, name, period_length FROM budgets WHERE budget_id = ?1 AND budget_id in (
+            "SELECT budget_id, owner, name, spend_limit, period_length FROM budgets WHERE budget_id = ?1 AND budget_id in (
             SELECT budget_id FROM (SELECT budget_id, owner AS username FROM budgets
             UNION SELECT budget_id, username FROM can_access_budget) WHERE username in
             (SELECT username FROM users WHERE access_token = ?2))"
@@ -365,7 +369,8 @@ impl Database {
                 budget_id: row.get(0)?,
                 owner: row.get(1)?,
                 name: row.get(2)?,
-                period_length: row.get(3)?,
+                spend_limit: row.get(3)?,
+                period_length: row.get(4)?,
             })
         }) {
             Ok(budget) => Ok(Some(budget)),

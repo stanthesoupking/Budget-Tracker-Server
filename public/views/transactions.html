@@ -1,0 +1,37 @@
+<div>
+    <nav class="navbar navbar-dark bg-primary">
+        <a class="navbar-brand" href="#">Budget Tracker Server</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavAltMarkup"
+            aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse text-right" id="navbarNavAltMarkup">
+            <div class="navbar-nav">
+                <a class="nav-item nav-link active">Overview <span class="sr-only">(current)</span></a>
+                <a class="nav-item nav-link">Account</a>
+                <a id="logoutButton" class="nav-item nav-link">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h2 id="title"></h2>
+        <h4 id="subtitle" class="hidden">Transactions</h4>
+        <button class="btn btn-success" data-toggle="modal" data-target="#new-transaction-modal">Add Transaction</button>
+        <div class="transactions mt-3">
+            Loading...
+        </div>
+    </div>
+
+    <script>
+        getBudget(accessToken, stateData).done((data) => {
+            if ((data.status = "Success") && (data.budget)) {
+                $("#title").html(data.budget.name);
+                $("#subtitle").removeClass("hidden");
+            } else {
+                displayToast('transactions-get-fail');
+                location.hash = '#budgets';
+            }
+        });
+    </script>
+</div>
