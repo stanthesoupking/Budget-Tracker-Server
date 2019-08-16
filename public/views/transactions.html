@@ -16,22 +16,173 @@
 
     <div class="container mt-4">
         <h2 id="title"></h2>
-        <h4 id="subtitle" class="hidden">Transactions</h4>
-        <button class="btn btn-success" data-toggle="modal" data-target="#new-transaction-modal">Add Transaction</button>
-        <div class="transactions mt-3">
-            Loading...
+        <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="pills-transactions-tab" data-toggle="pill" href="#pills-transactions"
+                    role="tab" aria-controls="pills-transactions" aria-selected="true">Transactions</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="pills-share-tab" data-toggle="pill" href="#pills-share" role="tab"
+                    aria-controls="pills-share" aria-selected="false">Shared With</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="pills-options-tab" data-toggle="pill" href="#pills-options" role="tab"
+                    aria-controls="pills-options" aria-selected="false">Options</a>
+            </li>
+        </ul>
+        <div class="tab-content" id="pills-tabContent">
+            <div class="tab-pane fade show active" id="pills-transactions" role="tabpanel"
+                aria-labelledby="pills-transactions-tab">
+                <button class="btn btn-success" data-toggle="modal" data-target="#new-transaction-modal">
+                    Add Transaction
+                </button>
+                <div class="transactions mt-3">
+                    Loading...
+                </div>
+            </div>
+            <div class="tab-pane fade" id="pills-share" role="tabpanel" aria-labelledby="pills-share-tab">
+                <button class="btn btn-success" data-toggle="modal" data-target="#add-user-modal">
+                    Add User
+                </button>
+                <ul id="shared-with-list" class="list-group mt-3"></ul>
+            </div>
+            <div class="tab-pane fade" id="pills-options" role="tabpanel" aria-labelledby="pills-options-tab">
+                <button class="btn btn-danger" data-toggle="modal" data-target="#delete-budget-modal">
+                    Delete Budget
+                </button>
+            </div>
         </div>
+
     </div>
 
-    <script>
-        getBudget(accessToken, stateData).done((data) => {
-            if ((data.status = "Success") && (data.budget)) {
-                $("#title").html(data.budget.name);
-                $("#subtitle").removeClass("hidden");
-            } else {
-                displayToast('transactions-get-fail');
-                location.hash = '#budgets';
+    <!-- Modals -->
+
+    <!-- Add User Modal -->
+    <div class="modal fade" id="add-user-modal" tabindex="-1" role="dialog" aria-labelledby="add-user-modal-title"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="add-user-modal-title">Add User to Budget</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="add-user-modal-email-input" class="col-form-label">Email:</label>
+                        <input type="email" class="form-control" id="add-user-modal-email-input" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                        Cancel
+                    </button>
+                    <button id="add-user-modal-add-button" type="button" class="btn btn-primary" data-dismiss="modal">
+                        Add
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete Confirmation Modal -->
+        <div class="modal fade" id="delete-budget-modal" tabindex="-1" role="dialog"
+            aria-labelledby="delete-budget-modal-title" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="delete-budget-modal-title">Delete Budget</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        This action cannot be undone, are you sure you wish to continue?
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                            Cancel
+                        </button>
+                        <button id="delete-button" type="button" class="btn btn-danger" data-dismiss="modal">
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            budgetID = stateData;
+
+            getBudget(accessToken, budgetID).done((data) => {
+                if ((data.status = "Success") && (data.budget)) {
+                    budget = data.budget;
+                    $("#title").html(budget.name);
+
+                    // Get shared with
+                    getSharedWith(accessToken, budgetID).done((data) => {
+                        if ((data.status = "Success") && (data.users)) {
+                            $("#shared-with-list").html("");
+                            for (let user of data.users) {
+                                let text = user;
+                                if (user == budget.owner) {
+                                    text = text + ' (owner)';
+                                } else {
+                                    text = text + ` <button class="btn btn-danger ml-3" onclick="removeUser('${user}')">Remove</button>`;
+                                }
+                                $("#shared-with-list").append(`<li class="list-group-item">${text}</li>`);
+                            }
+
+                        } else {
+                            displayToast('transactions-get-fail');
+                            location.hash = '#budgets';
+                        }
+                    });
+
+                    // Setup delete button
+                    $("#delete-button").on("click", () => {
+                        deleteBudget(accessToken, budgetID).done((data) => {
+                            if (data.status == "Success") {
+                                displayToast("budget-delete-success");
+                                gotoView('budgets');
+                            } else {
+                                displayToast("budget-delete-fail");
+                            }
+                        });
+                    });
+
+                    // Setup add user button
+                    $("#add-user-modal-add-button").on("click", () => {
+                        addUserToBudget(accessToken, $("#add-user-modal-email-input").val(), budgetID).done((data) => {
+                            if (data.status == "Success") {
+                                displayToast("add-user-success");
+                                reloadView();
+                            } else {
+                                displayToast("add-user-fail");
+                            }
+                        });
+                    });
+
+                } else {
+                    displayToast('transactions-get-fail');
+                    location.hash = '#budgets';
+                }
+            });
+
+            $("#logoutButton").on("click", () => {
+                clearAccessTokenCookie();
+                gotoView('login');
+            });
+
+            function removeUser(email) {
+                removeUserFromBudget(accessToken, email, budgetID).done((data) => {
+                    if (data.status == "Success") {
+                        displayToast("remove-user-success");
+                        reloadView();
+                    } else {
+                        displayToast("remove-user-fail");
+                    }
+                });
             }
-        });
-    </script>
-</div>
+        </script>
+    </div>

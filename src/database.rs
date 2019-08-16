@@ -69,14 +69,14 @@ impl Database {
                     // Create admin user
                     println!(" === Admin User Setup ===");
 
-                    println!("Username:");
+                    println!("email:");
 
                     let mut buffer = String::new();
 
                     io::stdin().read_line(&mut buffer)
                         .expect("Failed reading line.");
                     
-                    let username = buffer;
+                    let email = buffer;
 
                     let password: String;
                     loop {
@@ -95,7 +95,14 @@ impl Database {
                     io::stdin().read_passwd(&mut io::stdout())
                         .expect("Failed reading password");
 
-                    let admin_user = User::new(&database, &username, &password, true);
+                    let admin_user = User::new(
+                        &database,
+                        &email,
+                        &String::from("Administrator"),
+                        &String::from("Account"),
+                        &password,
+                        true
+                    );
 
                     match database.insert_user(&admin_user) {
                         Ok(_) => {
@@ -117,7 +124,9 @@ impl Database {
         match self.db_conn.execute_batch(
             "
             CREATE TABLE users (
-                username TEXT NOT NULL PRIMARY KEY,
+                email TEXT NOT NULL PRIMARY KEY,
+                first_name TEXT NOT NULL,
+                last_name TEXT NOT NULL,
                 password TEXT NOT NULL,
                 access_token TEXT NOT NULL,
                 is_admin BOOL NOT NULL DEFAULT FALSE
@@ -129,15 +138,16 @@ impl Database {
                 name TEXT NOT NULL,
                 spend_limit FLOAT NOT NULL,
                 period_length INTEGER NOT NULL,
-                FOREIGN KEY(owner) REFERENCES users(username)
+                start_date DATE NOT NULL,
+                FOREIGN KEY(owner) REFERENCES users(email)
             );
 
             CREATE TABLE can_access_budget (
                 budget_id INTEGER NOT NULL,
-                username TEXT NOT NULL,
-                PRIMARY KEY(budget_id, username),
+                email TEXT NOT NULL,
+                PRIMARY KEY(budget_id, email),
                 FOREIGN KEY(budget_id) REFERENCES budgets(budget_id),
-                FOREIGN KEY(username) REFERENCES users(username)
+                FOREIGN KEY(email) REFERENCES users(email)
             );
 
             CREATE TABLE recurring_transactions (
@@ -153,13 +163,15 @@ impl Database {
             CREATE TABLE transactions (
                 transaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 budget_id INTEGER NOT NULL,
-                username INTEGER NOT NULL,
+                email INTEGER NOT NULL,
                 name TEXT NOT NULL,
                 note TEXT NOT NULL,
                 date DATE NOT NULL,
                 amount FLOAT NOT NULL,
+                recur_days INTEGER NOT NULL,
+                recur_until DATE,
                 FOREIGN KEY(budget_id) REFERENCES budgets(budget_id)
-                FOREIGN KEY(username) REFERENCES users(username)
+                FOREIGN KEY(email) REFERENCES users(email)
             );
             "
         ) {
@@ -185,10 +197,10 @@ impl Database {
     pub fn insert_user(&self, user: &User) -> Result<(), Error> {
         let res = self.db_conn.execute(
             "INSERT INTO users(
-                username, password, access_token, is_admin
+                email, first_name, last_name, password, access_token, is_admin
             )
-            VALUES(?1, ?2, ?3, ?4)",
-            params![user.username, user.password, user.access_token, user.is_admin]);
+            VALUES(?1, ?2, ?3, ?4, ?5, ?6)",
+            params![user.email, user.first_name, user.last_name, user.password, user.access_token, user.is_admin]);
 
         match res {
             Ok(_) => Ok(()),
@@ -204,18 +216,20 @@ impl Database {
         }
     }
 
-    pub fn get_user_by_username(&self, username: &str) -> Result<Option<User>, Error> {
+    pub fn get_user_by_email(&self, email: &str) -> Result<Option<User>, Error> {
         let mut stmt = self.db_conn.prepare(
-            "SELECT username, password, access_token, is_admin
-            FROM users WHERE username = ?1"
+            "SELECT email, first_name, last_name, password, access_token, is_admin
+            FROM users WHERE email = ?1"
         )?;
 
-        match stmt.query_row(params![username], |row| {
+        match stmt.query_row(params![email], |row| {
             Ok(User {
-                username: row.get(0)?,
-                password: row.get(1)?,
-                access_token: row.get(2)?,
-                is_admin: row.get(3)?,
+                email: row.get(0)?,
+                first_name: row.get(1)?,
+                last_name: row.get(2)?,
+                password: row.get(3)?,
+                access_token: row.get(4)?,
+                is_admin: row.get(5)?,
             })
         }) {
             Ok(user) => Ok(Some(user)),
@@ -228,16 +242,18 @@ impl Database {
 
     pub fn get_user_by_access_token(&self, access_token: &str) -> Result<Option<User>, Error> {
         let mut stmt = self.db_conn.prepare(
-            "SELECT username, password, access_token, is_admin
+            "SELECT email, first_name, last_name, password, access_token, is_admin
             FROM users WHERE access_token = ?1"
         )?;
 
         match stmt.query_row(params![access_token], |row| {
             Ok(User {
-                username: row.get(0)?,
-                password: row.get(1)?,
-                access_token: row.get(2)?,
-                is_admin: row.get(3)?,
+                email: row.get(0)?,
+                first_name: row.get(1)?,
+                last_name: row.get(2)?,
+                password: row.get(3)?,
+                access_token: row.get(4)?,
+                is_admin: row.get(5)?,
             })
         }) {
             Ok(user) => Ok(Some(user)),
@@ -251,13 +267,16 @@ impl Database {
     pub fn update_user(&self, user: &User) -> Result<(), Error> {
 
         let res = self.db_conn.execute(
-            "UPDATE users SET password = ?1, access_token = ?2, is_admin = ?3
-            WHERE username = ?4",
+            "UPDATE users SET first_name = ?1, SET last_name ?2,
+            SET password = ?3, access_token = ?4, is_admin = ?5
+            WHERE email = ?4",
             params![
+                user.first_name,
+                user.last_name,
                 user.password,
                 user.access_token,
                 user.is_admin,
-                user.username
+                user.email
             ]
         );
 
@@ -272,10 +291,10 @@ impl Database {
 
     pub fn get_available_budgets(&self, access_token: &str) -> Result<Vec<Budget>, Error> {
         let mut stmt = self.db_conn.prepare(
-            "SELECT budget_id, owner, name, spend_limit, period_length FROM budgets WHERE budget_id in (
-            SELECT budget_id FROM (SELECT budget_id, owner AS username FROM budgets
-            UNION SELECT budget_id, username FROM can_access_budget) WHERE username in
-            (SELECT username FROM users WHERE access_token = ?1))"
+            "SELECT budget_id, owner, name, spend_limit, period_length, start_date FROM budgets WHERE budget_id in (
+            SELECT budget_id FROM (SELECT budget_id, owner AS email FROM budgets
+            UNION SELECT budget_id, email FROM can_access_budget) WHERE email in
+            (SELECT email FROM users WHERE access_token = ?1))"
         )?;
 
         let mut result: Vec<Budget> = Vec::new();
@@ -287,6 +306,7 @@ impl Database {
                 name: row.get(2)?,
                 spend_limit: row.get(3)?,
                 period_length: row.get(4)?,
+                start_date: row.get(5)?
             })
         });
 
@@ -308,20 +328,21 @@ impl Database {
 
         let res = self.db_conn.execute(
             "INSERT INTO budgets(
-                owner, name, spend_limit, period_length
+                owner, name, spend_limit, period_length, start_date
             )
-            VALUES(?1, ?2, ?3, ?4)",
-            params![user.username, budget.name, budget.spend_limit, budget.period_length]);
+            VALUES(?1, ?2, ?3, ?4, ?5)",
+            params![user.email, budget.name, budget.spend_limit, budget.period_length, budget.start_date]);
 
         match res {
             Ok(_) => {
                 let budget_id = self.db_conn.last_insert_rowid();
                 Ok(Budget {
                     budget_id: Some(budget_id),
-                    owner: Some(user.username),
+                    owner: Some(user.email),
                     name: budget.name.clone(),
                     spend_limit: budget.spend_limit,
-                    period_length: budget.period_length
+                    period_length: budget.period_length,
+                    start_date: budget.start_date.clone()
                 })
             },
             Err(error) => match error {
@@ -334,7 +355,7 @@ impl Database {
     pub fn get_budget(&self, budget_id: i64) -> Result<Option<Budget>, Error> {
         // Get budget
         let mut stmt = self.db_conn.prepare(
-            "SELECT budget_id, owner, name, spend_limit, period_length FROM budgets
+            "SELECT budget_id, owner, name, spend_limit, period_length, start_date FROM budgets
             WHERE budget_id = ?1"
         )?;
 
@@ -345,6 +366,7 @@ impl Database {
                 name: row.get(2)?,
                 spend_limit: row.get(3)?,
                 period_length: row.get(4)?,
+                start_date: row.get(5)?
             })
         }) {
             Ok(budget) => Ok(Some(budget)),
@@ -358,10 +380,10 @@ impl Database {
     pub fn get_available_budget(&self, access_token: &str, budget_id: i64) -> Result<Option<Budget>, Error> {
         // Get available budget
         let mut stmt = self.db_conn.prepare(
-            "SELECT budget_id, owner, name, spend_limit, period_length FROM budgets WHERE budget_id = ?1 AND budget_id in (
-            SELECT budget_id FROM (SELECT budget_id, owner AS username FROM budgets
-            UNION SELECT budget_id, username FROM can_access_budget) WHERE username in
-            (SELECT username FROM users WHERE access_token = ?2))"
+            "SELECT budget_id, owner, name, spend_limit, period_length, start_date FROM budgets WHERE budget_id = ?1 AND budget_id in (
+            SELECT budget_id FROM (SELECT budget_id, owner AS email FROM budgets
+            UNION SELECT budget_id, email FROM can_access_budget) WHERE email in
+            (SELECT email FROM users WHERE access_token = ?2))"
         )?;
 
         match stmt.query_row(params![budget_id, access_token], |row| {
@@ -371,6 +393,7 @@ impl Database {
                 name: row.get(2)?,
                 spend_limit: row.get(3)?,
                 period_length: row.get(4)?,
+                start_date: row.get(5)?
             })
         }) {
             Ok(budget) => Ok(Some(budget)),
@@ -401,7 +424,7 @@ impl Database {
                 };
 
                 // Check if user is the budget owner
-                if owner != user.username {
+                if owner != user.email {
                     return Err(Error::UserDeniedError);
                 }
 
@@ -432,25 +455,25 @@ impl Database {
         };
 
         let mut stmt = self.db_conn.prepare(
-            "SELECT username FROM users WHERE username IN (SELECT username FROM (SELECT owner AS username FROM budgets WHERE budget_id = ?1
-            UNION SELECT username FROM can_access_budget WHERE budget_id = ?1))"
+            "SELECT email FROM users WHERE email IN (SELECT email FROM (SELECT owner AS email FROM budgets WHERE budget_id = ?1
+            UNION SELECT email FROM can_access_budget WHERE budget_id = ?1))"
         )?;
 
         let mut is_available = false;
         let mut result: Vec<String> = Vec::new();
 
-        let username_iter = stmt.query_map(params![budget_id], |row| {
+        let email_iter = stmt.query_map(params![budget_id], |row| {
             Ok(row.get(0)?)
         });
 
-        for username in username_iter? {
-            let username = username?;
+        for email in email_iter? {
+            let email = email?;
 
-            if username == user.username {
+            if email == user.email {
                 is_available = true;
             }
 
-            result.push(username);
+            result.push(email);
         }
 
         if result.len() == 0 {
@@ -463,7 +486,7 @@ impl Database {
     }
 
     pub fn add_can_access_budget(&self, access_token: &str, budget_id: i64,
-        username: &str) -> Result<(), Error> {
+        email: &str) -> Result<(), Error> {
 
         // Get current user
         let user = match self.get_user_by_access_token(access_token) {
@@ -486,7 +509,7 @@ impl Database {
         // Check if the current user is the budget owner
         match budget.owner {
             Some(owner) => {
-                if !owner.eq(&user.username) {
+                if !owner.eq(&user.email) {
                     return Err(Error::UserDeniedError);
                 }
             },
@@ -494,16 +517,16 @@ impl Database {
         };
 
         // Check if the request is trying to give owner access to their own budget
-        if username.eq(&user.username) {
+        if email.eq(&user.email) {
             return Err(Error::AccessRecursionError);
         }
 
         let res = self.db_conn.execute(
             "INSERT INTO can_access_budget(
-                budget_id, username
+                budget_id, email
             )
             VALUES(?1, ?2)",
-            params![budget_id, username]);
+            params![budget_id, email]);
 
         match res {
             Ok(_) => Ok(()),
@@ -514,7 +537,7 @@ impl Database {
         }
     }
 
-    pub fn delete_can_access_budget(&self, access_token: &str, budget_id: i64, username: &str) -> Result<(), Error> {
+    pub fn delete_can_access_budget(&self, access_token: &str, budget_id: i64, email: &str) -> Result<(), Error> {
         let user = match self.get_user_by_access_token(access_token) {
             Ok(user) => match user {
                 Some(user) => user,
@@ -534,14 +557,14 @@ impl Database {
                 };
 
                 // Check if user is the budget owner
-                if owner != user.username {
+                if owner != user.email {
                     return Err(Error::UserDeniedError);
                 }
 
                 // Perform deletion
                 let res = self.db_conn.execute(
-                    "DELETE FROM can_access_budget WHERE budget_id = ?1 AND username = ?2",
-                    params![budget_id, username]);
+                    "DELETE FROM can_access_budget WHERE budget_id = ?1 AND email = ?2",
+                    params![budget_id, email]);
                 
                 match res {
                     Ok(_) => Ok(()),
@@ -570,7 +593,9 @@ fn rollback(path: &str, error: Error) {
 
 // --- User Type ---
 pub struct User {
-    pub username: String,
+    pub email: String,
+    pub first_name: String,
+    pub last_name: String,
     pub password: String,
     pub access_token: String,
     pub is_admin: bool
@@ -581,21 +606,24 @@ impl User {
     /// Constructs a new `User`
     /// 
     /// Note: The password field should be plaintext (it is hashed here)
-    pub fn new(database: &Database, username: &String, password: &String, is_admin: bool) -> User {
+    pub fn new(database: &Database, email: &String, first_name: &String,
+        last_name: &String, password: &String, is_admin: bool) -> User {
         let hpassword = database.hash(password);
 
-        let access_token = User::generate_access_token(database, username, &hpassword);
+        let access_token = User::generate_access_token(database, email, &hpassword);
 
         User {
-            username: username.clone(),
+            email: email.clone(),
+            first_name: first_name.clone(),
+            last_name: last_name.clone(),
             password: hpassword,
             access_token,
             is_admin
         }
     }
 
-    fn generate_access_token(database: &Database, username: &String, hpassword: &String) -> String {
-        let mut s = username.clone();
+    fn generate_access_token(database: &Database, email: &String, hpassword: &String) -> String {
+        let mut s = email.clone();
         s.push_str("::::");
         s.push_str(hpassword);
 
@@ -604,6 +632,6 @@ impl User {
 
     pub fn change_password(&mut self, database: &Database, hpassword: &String) {
         self.password = String::from(hpassword);
-        self.access_token = User::generate_access_token(database, &self.username, &self.password);
+        self.access_token = User::generate_access_token(database, &self.email, &self.password);
     }
 }

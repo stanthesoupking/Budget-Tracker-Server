@@ -15,7 +15,7 @@ pub enum ResultStatus {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CredentialForm {
-    pub username: String,
+    pub email: String,
     pub password: String
 }
 
@@ -28,7 +28,9 @@ pub struct ChangePasswordForm {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RegisterAccountForm {
-    pub username: String,
+    pub email: String,
+    pub first_name: String,
+    pub last_name: String,
     pub password: String
 }
 
@@ -48,14 +50,15 @@ pub struct AddBudgetForm {
     pub access_token: String,
     pub budget_name: String,
     pub budget_spend_limit: f64,
-    pub budget_period_length: i64
+    pub budget_period_length: i64,
+    pub budget_start_date: Option<String>
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CanAccessBudgetForm {
     pub access_token: String,
     pub budget_id: i64,
-    pub username: String
+    pub email: String
 }
 
 // --- RESULTS

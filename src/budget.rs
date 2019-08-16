@@ -6,17 +6,19 @@ pub struct Budget {
     pub owner: Option<String>,
     pub name: String,
     pub spend_limit: f64,
-    pub period_length: i64
+    pub period_length: i64,
+    pub start_date: String
 }
 
 impl Budget {
-    pub fn new(name: String, spend_limit: f64, period_length: i64) -> Budget {
+    pub fn new(name: String, spend_limit: f64, period_length: i64, start_date: String) -> Budget {
         Budget {
             budget_id: None,
             owner: None,
             name,
             spend_limit,
-            period_length
+            period_length,
+            start_date
         }
     }
 }

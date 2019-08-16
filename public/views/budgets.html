@@ -47,6 +47,10 @@
                             <label for="budget-period-length" class="col-form-label">Period Length (days):</label>
                             <input type="number" class="form-control" id="budget-period-length" value="7">
                         </div>
+                        <div class="form-group">
+                            <label for="budget-start-date" class="col-form-label">Start Date:</label>
+                            <input class="form-control" data-date-format="dd/mm/yyyy" id="budget-start-date" data-date-end-date="0d">
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -59,51 +63,63 @@
 </div>
 
 <script>
-    $(document).ready(() => {
-        budgetCardTemplate = loadTemplate('budget-card');
+    budgetCardTemplate = loadTemplate('budget-card');
 
-        $("#logoutButton").on("click", () => {
-            clearAccessTokenCookie();
-            loadView('login');
-        });
+    $('#budget-start-date').datepicker({
+        weekStart: 1,
+        autoclose: true,
+        todayHighlight: true,
+    });
 
-        $("#new-budget-modal-form").on("submit", (e) => {
-            e.preventDefault();
+    now = new Date();
 
-            let budgetName = $("#new-budget-modal-form #budget-name").val();
-            let budgetSpendLimit = $("#new-budget-modal-form #budget-spending-limit").val();
-            let budgetPeriodLength = $("#new-budget-modal-form #budget-period-length").val();
+    $('#budget-start-date').val(now.getDate() + '/' + (now.getMonth() + 1) + '/' + now.getFullYear());
 
-            createBudget(accessToken, budgetName, budgetSpendLimit, budgetPeriodLength).done((data) => {
-                if (data.status == "Success") {
-                    displayToast("budget-create-success");
-                    reloadView();
-                    $("#new-budget-modal").modal('hide');
-                } else {
-                    displayToast("budget-create-fail");
-                    $("#new-budget-modal").modal('hide');
-                }
-            });
-        });
+    $("#logoutButton").on("click", () => {
+        clearAccessTokenCookie();
+        gotoView('login');
+    });
 
-        // Get budgets
-        getBudgets(accessToken).done((data) => {
+    $("#new-budget-modal-form").on("submit", (e) => {
+        e.preventDefault();
+
+        let budgetName = $("#new-budget-modal-form #budget-name").val();
+        let budgetSpendLimit = $("#new-budget-modal-form #budget-spending-limit").val();
+        let budgetPeriodLength = $("#new-budget-modal-form #budget-period-length").val();
+
+        let dateParts = $("#new-budget-modal-form #budget-start-date").val().split("/");
+
+        let budgetStartDate = dateParts[2] + '-' + dateParts[1] + '-' +dateParts[0];
+
+        createBudget(accessToken, budgetName, budgetSpendLimit, budgetPeriodLength, budgetStartDate).done((data) => {
             if (data.status == "Success") {
-                $(".overview-budgets").html("Your budgets");
-                for (let budget of data.budgets) {
-                    let card = $(budgetCardTemplate);
-
-                    card.find("#title").html(budget.name);
-
-                    card.on("click", () => {
-                        window.location.hash = "transactions:" + budget.budget_id;
-                    })
-
-                    $(".overview-budgets").append(card);
-                }
+                displayToast("budget-create-success");
+                reloadView();
+                $("#new-budget-modal").modal('hide');
             } else {
-
+                displayToast("budget-create-fail");
+                $("#new-budget-modal").modal('hide');
             }
         });
+    });
+
+    // Get budgets
+    getBudgets(accessToken).done((data) => {
+        if (data.status == "Success") {
+            $(".overview-budgets").html("Your budgets");
+            for (let budget of data.budgets) {
+                let card = $(budgetCardTemplate);
+
+                card.find("#title").html(budget.name);
+
+                card.on("click", () => {
+                    window.location.hash = "transactions:" + budget.budget_id;
+                })
+
+                $(".overview-budgets").append(card);
+            }
+        } else {
+
+        }
     });
 </script>

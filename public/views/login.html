@@ -3,11 +3,12 @@
         <img class="mb-4" src="/svg/logo.svg" alt="" width="72" height="72">
         <h1 class="h3 mb-3">Budget Tracker Server</h1>
         <h1 class="h4 mb-3 font-weight-normal">Please sign in</h1>
-        <label for="inputUsername" class="sr-only">Username</label>
-        <input type="text" id="inputUsername" class="form-control" placeholder="Username" required autofocus>
+        <label for="inputEmail" class="sr-only">email</label>
+        <input type="text" id="inputEmail" class="form-control" placeholder="email" required autofocus>
         <label for="inputPassword" class="sr-only">Password</label>
         <input type="password" id="inputPassword" class="form-control" placeholder="Password" required>
         <button class="btn btn-lg btn-primary btn-block" type="submit">Sign in</button>
+        <a href="#register">Or register if you don't have an account.</a>
         <p class="mt-5 mb-3 text-muted">&copy; 2019 Stanley Fuller</p>
     </form>
 </div>
@@ -16,15 +17,16 @@
     $(".form-signin").on("submit", (e) => {
         e.preventDefault();
 
-        let username = $("#inputUsername").val();
+        let email = $("#inputEmail").val();
         let password = $("#inputPassword").val();
 
-        getAccessToken(username, password)
+        getAccessToken(email, password)
             .done((data) => {
                 if (data.status == 'Success') {
                     setAccessTokenCookie(data.access_token);
+                    accessToken = data.access_token;
                     displayToast('login-success');
-                    loadView('overview');
+                    gotoView('budgets');
                 } else {
                     displayToast('login-fail');
                 }

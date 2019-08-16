@@ -3,6 +3,7 @@ use actix_web::{web, Responder, Scope};
 use crate::budget::Budget;
 use crate::database::{User};
 use crate::shared::*;
+use crate::util::*;
 
 use crate::AppState;
 
@@ -22,10 +23,10 @@ pub fn get_service() -> Scope {
 
 // API Routes
 
-fn register_user(data: web::Data<AppState>, json: web::Json<CredentialForm>) -> impl Responder {
+fn register_user(data: web::Data<AppState>, json: web::Json<RegisterAccountForm>) -> impl Responder {
     let database = data.database.lock().unwrap();
 
-    let user = User::new(&database, &json.username, &json.password, false);
+    let user = User::new(&database, &json.email, &json.first_name, &json.last_name, &json.password, false);
 
     match database.insert_user(&user) {
         Ok(_) => web::Json(AccessTokenResult {
@@ -45,7 +46,7 @@ fn register_user(data: web::Data<AppState>, json: web::Json<CredentialForm>) -> 
 fn get_access_token(data: web::Data<AppState>, json: web::Json<CredentialForm>) -> impl Responder {
     let database = data.database.lock().unwrap();
 
-    let user = database.get_user_by_username(&json.username);
+    let user = database.get_user_by_email(&json.email);
 
     match user {
         Ok(user) => match user {
@@ -147,7 +148,17 @@ fn list_budgets(data: web::Data<AppState>, json: web::Json<AccessTokenForm>) -> 
 fn add_budget(data: web::Data<AppState>, json: web::Json<AddBudgetForm>) -> impl Responder {
     let database = data.database.lock().unwrap();
 
-    let budget = Budget::new(json.budget_name.clone(), json.budget_spend_limit, json.budget_period_length);
+    let start_date = match &json.budget_start_date {
+        Some(x) => x.clone(),
+        None => get_current_date()
+    };
+
+    let budget = Budget::new(
+        json.budget_name.clone(),
+        json.budget_spend_limit,
+        json.budget_period_length,
+        start_date
+    );
 
     let res = database.add_budget(&json.access_token, &budget);
 
@@ -207,12 +218,12 @@ fn get_budget(data: web::Data<AppState>, json: web::Json<SelectForm>) -> impl Re
 fn list_can_access_budget(data: web::Data<AppState>, json: web::Json<SelectForm>) -> impl Responder {
     let database = data.database.lock().unwrap();
 
-    let usernames = database.get_available_can_access_budget_users(&json.access_token, json.id);
+    let emails = database.get_available_can_access_budget_users(&json.access_token, json.id);
 
-    match usernames {
-        Ok(usernames) => web::Json(UserListResult {
+    match emails {
+        Ok(emails) => web::Json(UserListResult {
             status: ResultStatus::Success,
-            users: Some(usernames),
+            users: Some(emails),
         }),
         Err(error) => web::Json(UserListResult {
             status: ResultStatus::Error(String::from(format!(
@@ -228,7 +239,7 @@ fn list_can_access_budget(data: web::Data<AppState>, json: web::Json<SelectForm>
 fn add_can_access_budget(data: web::Data<AppState>, json: web::Json<CanAccessBudgetForm>) -> impl Responder {
     let database = data.database.lock().unwrap();
 
-    let res = database.add_can_access_budget(&json.access_token, json.budget_id, &json.username);
+    let res = database.add_can_access_budget(&json.access_token, json.budget_id, &json.email);
 
     match res {
         Ok(_) => web::Json(StatusResult {
@@ -246,7 +257,7 @@ fn add_can_access_budget(data: web::Data<AppState>, json: web::Json<CanAccessBud
 fn delete_can_access_budget(data: web::Data<AppState>, json: web::Json<CanAccessBudgetForm>) -> impl Responder {
     let database = data.database.lock().unwrap();
 
-    let res = database.delete_can_access_budget(&json.access_token, json.budget_id, &json.username);
+    let res = database.delete_can_access_budget(&json.access_token, json.budget_id, &json.email);
 
     match res {
         Ok(_) => web::Json(StatusResult {
