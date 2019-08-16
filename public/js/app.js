@@ -168,3 +168,67 @@ function removeUserFromBudget(access_token, email, budgetID) {
         contentType: 'application/json'
     });
 }
+
+function addTransactionToBudget(access_token, budgetID,
+    transactionName, transactionDescription, transactionAmount,
+    transactionRecurDays, transactionRecurUntil) {
+    return $.ajax("api/add/transaction", {
+        data: JSON.stringify({
+            access_token,
+            budget_id: Number(budgetID),
+            transaction_name: transactionName,
+            transaction_description: transactionDescription,
+            transaction_amount: parseFloat(transactionAmount),
+            transaction_recur_days: Number(transactionRecurDays),
+            transaction_recur_until: transactionRecurUntil
+        }),
+        type: 'POST',
+        contentType: 'application/json'
+    });
+}
+
+function getBudgetTransactions(access_token, budgetID) {
+    return $.ajax("api/list/transactions", {
+        data: JSON.stringify({
+            access_token,
+            id: Number(budgetID)
+        }),
+        type: 'POST',
+        contentType: 'application/json'
+    });
+}
+
+function getBudgetPeriods(access_token, budgetID) {
+    return $.ajax("api/get/budget_periods", {
+        data: JSON.stringify({
+            access_token,
+            id: Number(budgetID)
+        }),
+        type: 'POST',
+        contentType: 'application/json'
+    });
+}
+
+
+function getCurrentBudgetPeriod(access_token, budgetID) {
+    return $.ajax("api/get/budget/current_period", {
+        data: JSON.stringify({
+            access_token,
+            id: Number(budgetID)
+        }),
+        type: 'POST',
+        contentType: 'application/json'
+    });
+}
+
+function getBudgetSpent(access_token, budgetID, periodID) {
+    return $.ajax("api/get/budget/spent", {
+        data: JSON.stringify({
+            access_token,
+            budget_id: Number(budgetID),
+            period_id: Number(periodID),
+        }),
+        type: 'POST',
+        contentType: 'application/json'
+    });
+}

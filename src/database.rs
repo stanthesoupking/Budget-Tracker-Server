@@ -1,15 +1,21 @@
-
 use crate::budget::Budget;
+use crate::budget_period::BudgetPeriod;
+use crate::transaction::Transaction;
+use crate::util::*;
 
 use std::fs;
-use std::path::Path;
 use std::io;
+use std::path::Path;
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 
-use rusqlite::{Connection, params, NO_PARAMS};
 use rusqlite::Error::SqliteFailure;
+use rusqlite::{params, Connection, NO_PARAMS};
+
+use chrono::{DateTime, Duration, FixedOffset, Utc};
+
+use time::Duration as OldDuration;
 
 use termion::input::TermRead;
 
@@ -24,18 +30,26 @@ pub enum Error {
     UserDeniedError,
     AccessRecursionError,
     SqliteError(libsqlite3_sys::Error, Option<String>),
-    UnknownError
+    UnknownError,
 }
 
 impl std::convert::From<rusqlite::Error> for Error {
     fn from(error: rusqlite::Error) -> Self {
+        println!("SQLITE ERROR: {:#?}", error);
+        Error::UnknownError
+    }
+}
+
+impl std::convert::From<chrono::ParseError> for Error {
+    fn from(error: chrono::ParseError) -> Self {
+        println!("TIME PARSING ERROR: {:#?}", error);
         Error::UnknownError
     }
 }
 
 pub struct Database {
     db_conn: Connection,
-    secret: String 
+    secret: String,
 }
 
 impl Database {
@@ -48,21 +62,18 @@ impl Database {
         // Connect to sqlite database
         let db_conn = match Connection::open(path) {
             Ok(conn) => conn,
-            Err(_) => return Err(Error::LoadFileError)
+            Err(_) => return Err(Error::LoadFileError),
         };
 
         // Enable foreign key support
-        db_conn.execute("PRAGMA foreign_keys = ON", NO_PARAMS)
+        db_conn
+            .execute("PRAGMA foreign_keys = ON", NO_PARAMS)
             .expect("Failed enabling foreign key support.");
 
-        let database = Database {
-            secret,
-            db_conn
-        };
+        let database = Database { secret, db_conn };
 
         // Does the database need to be initialised?
         if init_req {
-
             match database.init() {
                 Err(error) => rollback(path, error),
                 Ok(_) => {
@@ -73,9 +84,9 @@ impl Database {
 
                     let mut buffer = String::new();
 
-                    io::stdin().read_line(&mut buffer)
+                    io::stdin()
+                        .read_line(&mut buffer)
                         .expect("Failed reading line.");
-                    
                     let email = buffer;
 
                     let password: String;
@@ -84,15 +95,16 @@ impl Database {
                         let buffer = io::stdin().read_passwd(&mut io::stdout());
 
                         match buffer {
-                            Ok(Some(p)) => { 
+                            Ok(Some(p)) => {
                                 password = p;
                                 break;
-                            },
-                            _ => ()
+                            }
+                            _ => (),
                         }
                     }
 
-                    io::stdin().read_passwd(&mut io::stdout())
+                    io::stdin()
+                        .read_passwd(&mut io::stdout())
                         .expect("Failed reading password");
 
                     let admin_user = User::new(
@@ -101,13 +113,13 @@ impl Database {
                         &String::from("Administrator"),
                         &String::from("Account"),
                         &password,
-                        true
+                        true,
                     );
 
                     match database.insert_user(&admin_user) {
                         Ok(_) => {
                             println!("Admin user created.");
-                        },
+                        }
                         Err(error) => {
                             println!("Error: Failed creating admin user.");
                             rollback(path, error)
@@ -150,22 +162,12 @@ impl Database {
                 FOREIGN KEY(email) REFERENCES users(email)
             );
 
-            CREATE TABLE recurring_transactions (
-                recurring_transaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                budget_id INTEGER NOT NULL,
-                name TEXT NOT NULL,
-                note TEXT NOT NULL,
-                amount FLOAT NOT NULL,
-                day_in_period INTEGER NOT NULL,
-                FOREIGN KEY(budget_id) REFERENCES budgets(budget_id)
-            );
-
             CREATE TABLE transactions (
                 transaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 budget_id INTEGER NOT NULL,
-                email INTEGER NOT NULL,
+                email TEXT NOT NULL,
                 name TEXT NOT NULL,
-                note TEXT NOT NULL,
+                description TEXT NOT NULL,
                 date DATE NOT NULL,
                 amount FLOAT NOT NULL,
                 recur_days INTEGER NOT NULL,
@@ -173,12 +175,11 @@ impl Database {
                 FOREIGN KEY(budget_id) REFERENCES budgets(budget_id)
                 FOREIGN KEY(email) REFERENCES users(email)
             );
-            "
+            ",
         ) {
             Ok(_) => Ok(()),
-            Err(_) => Err(Error::UnknownError)
+            Err(_) => Err(Error::UnknownError),
         }
-
     }
 
     pub fn hash(&self, s: &String) -> String {
@@ -200,26 +201,32 @@ impl Database {
                 email, first_name, last_name, password, access_token, is_admin
             )
             VALUES(?1, ?2, ?3, ?4, ?5, ?6)",
-            params![user.email, user.first_name, user.last_name, user.password, user.access_token, user.is_admin]);
+            params![
+                user.email,
+                user.first_name,
+                user.last_name,
+                user.password,
+                user.access_token,
+                user.is_admin
+            ],
+        );
 
         match res {
             Ok(_) => Ok(()),
             Err(error) => match error {
-                SqliteFailure(error, _) => {
-                    match error.code {
-                        rusqlite::ErrorCode::ConstraintViolation => Err(Error::UserAlreadyExists),
-                        _ => Err(Error::UnknownError)
-                    }
+                SqliteFailure(error, _) => match error.code {
+                    rusqlite::ErrorCode::ConstraintViolation => Err(Error::UserAlreadyExists),
+                    _ => Err(Error::UnknownError),
                 },
-                _ => Err(Error::UnknownError)
-            }
+                _ => Err(Error::UnknownError),
+            },
         }
     }
 
     pub fn get_user_by_email(&self, email: &str) -> Result<Option<User>, Error> {
         let mut stmt = self.db_conn.prepare(
             "SELECT email, first_name, last_name, password, access_token, is_admin
-            FROM users WHERE email = ?1"
+            FROM users WHERE email = ?1",
         )?;
 
         match stmt.query_row(params![email], |row| {
@@ -235,15 +242,15 @@ impl Database {
             Ok(user) => Ok(Some(user)),
             Err(error) => match error {
                 QueryReturnedNoRows => Ok(None),
-                _ => Err(Error::UnknownError)
-            }
+                _ => Err(Error::UnknownError),
+            },
         }
     }
 
     pub fn get_user_by_access_token(&self, access_token: &str) -> Result<Option<User>, Error> {
         let mut stmt = self.db_conn.prepare(
             "SELECT email, first_name, last_name, password, access_token, is_admin
-            FROM users WHERE access_token = ?1"
+            FROM users WHERE access_token = ?1",
         )?;
 
         match stmt.query_row(params![access_token], |row| {
@@ -259,13 +266,12 @@ impl Database {
             Ok(user) => Ok(Some(user)),
             Err(error) => match error {
                 QueryReturnedNoRows => Ok(None),
-                _ => Err(Error::UnknownError)
-            }
+                _ => Err(Error::UnknownError),
+            },
         }
     }
 
     pub fn update_user(&self, user: &User) -> Result<(), Error> {
-
         let res = self.db_conn.execute(
             "UPDATE users SET first_name = ?1, SET last_name ?2,
             SET password = ?3, access_token = ?4, is_admin = ?5
@@ -277,15 +283,15 @@ impl Database {
                 user.access_token,
                 user.is_admin,
                 user.email
-            ]
+            ],
         );
 
         match res {
             Ok(_) => Ok(()),
             Err(error) => match error {
                 SqliteFailure(error, desc) => Err(Error::SqliteError(error, desc)),
-                _ => Err(Error::UnknownError)
-            }
+                _ => Err(Error::UnknownError),
+            },
         }
     }
 
@@ -306,7 +312,7 @@ impl Database {
                 name: row.get(2)?,
                 spend_limit: row.get(3)?,
                 period_length: row.get(4)?,
-                start_date: row.get(5)?
+                start_date: row.get(5)?,
             })
         });
 
@@ -318,12 +324,9 @@ impl Database {
     }
 
     pub fn add_budget(&self, access_token: &str, budget: &Budget) -> Result<Budget, Error> {
-        let user = match self.get_user_by_access_token(access_token) {
-            Ok(user) => match user {
-                Some(user) => user,
-                None => return Err(Error::InvalidCredentials)
-            },
-            Err(error) => return Err(error)
+        let user = match self.get_user_by_access_token(access_token)? {
+            Some(x) => x,
+            None => return Err(Error::InvalidCredentials),
         };
 
         let res = self.db_conn.execute(
@@ -331,7 +334,14 @@ impl Database {
                 owner, name, spend_limit, period_length, start_date
             )
             VALUES(?1, ?2, ?3, ?4, ?5)",
-            params![user.email, budget.name, budget.spend_limit, budget.period_length, budget.start_date]);
+            params![
+                user.email,
+                budget.name,
+                budget.spend_limit,
+                budget.period_length,
+                budget.start_date
+            ],
+        );
 
         match res {
             Ok(_) => {
@@ -342,13 +352,13 @@ impl Database {
                     name: budget.name.clone(),
                     spend_limit: budget.spend_limit,
                     period_length: budget.period_length,
-                    start_date: budget.start_date.clone()
+                    start_date: budget.start_date.clone(),
                 })
-            },
+            }
             Err(error) => match error {
                 SqliteFailure(error, desc) => Err(Error::SqliteError(error, desc)),
-                _ => Err(Error::UnknownError)
-            }
+                _ => Err(Error::UnknownError),
+            },
         }
     }
 
@@ -356,7 +366,7 @@ impl Database {
         // Get budget
         let mut stmt = self.db_conn.prepare(
             "SELECT budget_id, owner, name, spend_limit, period_length, start_date FROM budgets
-            WHERE budget_id = ?1"
+            WHERE budget_id = ?1",
         )?;
 
         match stmt.query_row(params![budget_id], |row| {
@@ -366,18 +376,22 @@ impl Database {
                 name: row.get(2)?,
                 spend_limit: row.get(3)?,
                 period_length: row.get(4)?,
-                start_date: row.get(5)?
+                start_date: row.get(5)?,
             })
         }) {
             Ok(budget) => Ok(Some(budget)),
             Err(error) => match error {
                 QueryReturnedNoRows => Ok(None),
-                _ => Err(Error::UnknownError)
-            }
+                _ => Err(Error::UnknownError),
+            },
         }
     }
 
-    pub fn get_available_budget(&self, access_token: &str, budget_id: i64) -> Result<Option<Budget>, Error> {
+    pub fn get_available_budget(
+        &self,
+        access_token: &str,
+        budget_id: i64,
+    ) -> Result<Option<Budget>, Error> {
         // Get available budget
         let mut stmt = self.db_conn.prepare(
             "SELECT budget_id, owner, name, spend_limit, period_length, start_date FROM budgets WHERE budget_id = ?1 AND budget_id in (
@@ -393,24 +407,21 @@ impl Database {
                 name: row.get(2)?,
                 spend_limit: row.get(3)?,
                 period_length: row.get(4)?,
-                start_date: row.get(5)?
+                start_date: row.get(5)?,
             })
         }) {
             Ok(budget) => Ok(Some(budget)),
             Err(error) => match error {
                 QueryReturnedNoRows => Ok(None),
-                _ => Err(Error::UnknownError)
-            }
+                _ => Err(Error::UnknownError),
+            },
         }
     }
 
     pub fn delete_budget(&self, access_token: &str, budget_id: i64) -> Result<(), Error> {
-        let user = match self.get_user_by_access_token(access_token) {
-            Ok(user) => match user {
-                Some(user) => user,
-                None => return Err(Error::InvalidCredentials)
-            },
-            Err(error) => return Err(error)
+        let user = match self.get_user_by_access_token(access_token)? {
+            Some(x) => x,
+            None => return Err(Error::InvalidCredentials),
         };
 
         // Get budget
@@ -420,7 +431,7 @@ impl Database {
             Some(budget) => {
                 let owner = match budget.owner {
                     Some(id) => id,
-                    None => return Err(Error::UnknownError)
+                    None => return Err(Error::UnknownError),
                 };
 
                 // Check if user is the budget owner
@@ -431,27 +442,28 @@ impl Database {
                 // Perform deletion
                 let res = self.db_conn.execute(
                     "DELETE FROM budgets WHERE budget_id = ?1",
-                    params![budget_id]);
-                
+                    params![budget_id],
+                );
                 match res {
                     Ok(_) => Ok(()),
                     Err(error) => match error {
                         SqliteFailure(error, desc) => Err(Error::SqliteError(error, desc)),
-                        _ => Err(Error::UnknownError)
-                    }
+                        _ => Err(Error::UnknownError),
+                    },
                 }
-            },
-            None => Err(Error::EntryNotFound)
+            }
+            None => Err(Error::EntryNotFound),
         }
     }
 
-    pub fn get_available_can_access_budget_users(&self, access_token: &str, budget_id: i64) -> Result<Vec<String>, Error> {
-        let user = match self.get_user_by_access_token(access_token) {
-            Ok(user) => match user {
-                Some(user) => user,
-                None => return Err(Error::InvalidCredentials)
-            },
-            Err(error) => return Err(error)
+    pub fn get_available_can_access_budget_users(
+        &self,
+        access_token: &str,
+        budget_id: i64,
+    ) -> Result<Vec<String>, Error> {
+        let user = match self.get_user_by_access_token(access_token)? {
+            Some(x) => x,
+            None => return Err(Error::InvalidCredentials),
         };
 
         let mut stmt = self.db_conn.prepare(
@@ -462,9 +474,7 @@ impl Database {
         let mut is_available = false;
         let mut result: Vec<String> = Vec::new();
 
-        let email_iter = stmt.query_map(params![budget_id], |row| {
-            Ok(row.get(0)?)
-        });
+        let email_iter = stmt.query_map(params![budget_id], |row| Ok(row.get(0)?));
 
         for email in email_iter? {
             let email = email?;
@@ -485,25 +495,25 @@ impl Database {
         }
     }
 
-    pub fn add_can_access_budget(&self, access_token: &str, budget_id: i64,
-        email: &str) -> Result<(), Error> {
-
+    pub fn add_can_access_budget(
+        &self,
+        access_token: &str,
+        budget_id: i64,
+        email: &str,
+    ) -> Result<(), Error> {
         // Get current user
-        let user = match self.get_user_by_access_token(access_token) {
-            Ok(user) => match user {
-                Some(user) => user,
-                None => return Err(Error::InvalidCredentials)
-            },
-            Err(error) => return Err(error)
+        let user = match self.get_user_by_access_token(access_token)? {
+            Some(x) => x,
+            None => return Err(Error::InvalidCredentials),
         };
 
         // Get budget
         let budget = match self.get_budget(budget_id) {
             Ok(budget) => match budget {
                 Some(budget) => budget,
-                None => return Err(Error::EntryNotFound)
+                None => return Err(Error::EntryNotFound),
             },
-            Err(error) => return Err(error)
+            Err(error) => return Err(error),
         };
 
         // Check if the current user is the budget owner
@@ -512,8 +522,8 @@ impl Database {
                 if !owner.eq(&user.email) {
                     return Err(Error::UserDeniedError);
                 }
-            },
-            None => return Err(Error::UnknownError)
+            }
+            None => return Err(Error::UnknownError),
         };
 
         // Check if the request is trying to give owner access to their own budget
@@ -526,24 +536,27 @@ impl Database {
                 budget_id, email
             )
             VALUES(?1, ?2)",
-            params![budget_id, email]);
+            params![budget_id, email],
+        );
 
         match res {
             Ok(_) => Ok(()),
             Err(error) => match error {
                 SqliteFailure(error, desc) => Err(Error::SqliteError(error, desc)),
-                _ => Err(Error::UnknownError)
-            }
+                _ => Err(Error::UnknownError),
+            },
         }
     }
 
-    pub fn delete_can_access_budget(&self, access_token: &str, budget_id: i64, email: &str) -> Result<(), Error> {
-        let user = match self.get_user_by_access_token(access_token) {
-            Ok(user) => match user {
-                Some(user) => user,
-                None => return Err(Error::InvalidCredentials)
-            },
-            Err(error) => return Err(error)
+    pub fn delete_can_access_budget(
+        &self,
+        access_token: &str,
+        budget_id: i64,
+        email: &str,
+    ) -> Result<(), Error> {
+        let user = match self.get_user_by_access_token(access_token)? {
+            Some(x) => x,
+            None => return Err(Error::InvalidCredentials),
         };
 
         // Get budget
@@ -553,7 +566,7 @@ impl Database {
             Some(budget) => {
                 let owner = match budget.owner {
                     Some(id) => id,
-                    None => return Err(Error::UnknownError)
+                    None => return Err(Error::UnknownError),
                 };
 
                 // Check if user is the budget owner
@@ -564,26 +577,275 @@ impl Database {
                 // Perform deletion
                 let res = self.db_conn.execute(
                     "DELETE FROM can_access_budget WHERE budget_id = ?1 AND email = ?2",
-                    params![budget_id, email]);
-                
+                    params![budget_id, email],
+                );
                 match res {
                     Ok(_) => Ok(()),
                     Err(error) => match error {
                         SqliteFailure(error, desc) => Err(Error::SqliteError(error, desc)),
-                        _ => Err(Error::UnknownError)
-                    }
+                        _ => Err(Error::UnknownError),
+                    },
                 }
-            },
-            None => Err(Error::EntryNotFound)
+            }
+            None => Err(Error::EntryNotFound),
         }
     }
 
+    pub fn get_budget_transactions(
+        &self,
+        access_token: &str,
+        budget_id: i64,
+    ) -> Result<Vec<Transaction>, Error> {
+        let user = match self.get_user_by_access_token(access_token)? {
+            Some(x) => x,
+            None => return Err(Error::InvalidCredentials),
+        };
+        let budget = match self.get_available_budget(access_token, budget_id)? {
+            Some(x) => x,
+            None => return Err(Error::EntryNotFound),
+        };
+
+        let mut stmt = self.db_conn.prepare(
+            "SELECT transaction_id, budget_id, email, name, description, date, amount, recur_days,
+            recur_until FROM transactions WHERE budget_id = ?1 ORDER BY date DESC",
+        )?;
+
+        let mut result: Vec<Transaction> = Vec::new();
+
+        let transaction_iter = stmt.query_map(params![budget_id], |row| {
+            Ok(Transaction {
+                transaction_id: row.get(0)?,
+                budget_id: row.get(1)?,
+                email: row.get(2)?,
+                name: row.get(3)?,
+                description: row.get(4)?,
+                date: row.get(5)?,
+                amount: row.get(6)?,
+                recur_days: row.get(7)?,
+                recur_until: row.get(8)?,
+            })
+        });
+
+        for transaction in transaction_iter? {
+            result.push(transaction?);
+        }
+
+        Ok(result)
+    }
+
+    // pub fn get_budget_transactions_in_period(
+    //     &self,
+    //     access_token: &str,
+    //     budget_id: i64,
+    //     period_id: i64
+    // ) -> Result<Vec<Transaction>, Error> {
+        
+    // }
+
+    pub fn add_transaction(
+        &self,
+        access_token: &str,
+        transaction: &Transaction,
+    ) -> Result<Transaction, Error> {
+        let user = match self.get_user_by_access_token(access_token)? {
+            Some(x) => x,
+            None => return Err(Error::InvalidCredentials),
+        };
+
+        let date = match &transaction.date {
+            Some(x) => x.clone(),
+            None => get_current_date(),
+        };
+
+        // TODO: verify that the current user has access to this budget
+
+        let res = self.db_conn.execute(
+            "INSERT INTO transactions(
+                budget_id, email, name, description, date, amount, recur_days, recur_until
+            )
+            VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                transaction.budget_id,
+                user.email,
+                transaction.name,
+                transaction.description,
+                date,
+                transaction.amount,
+                transaction.recur_days,
+                transaction.recur_until
+            ],
+        );
+
+        match res {
+            Ok(_) => {
+                let transaction_id = self.db_conn.last_insert_rowid();
+                Ok(Transaction {
+                    transaction_id: Some(transaction_id),
+                    budget_id: transaction.budget_id,
+                    email: Some(user.email.clone()),
+                    name: transaction.name.clone(),
+                    description: transaction.description.clone(),
+                    date: transaction.date.clone(),
+                    amount: transaction.amount,
+                    recur_days: transaction.recur_days,
+                    recur_until: transaction.recur_until.clone(),
+                })
+            }
+            Err(error) => match error {
+                SqliteFailure(error, desc) => Err(Error::SqliteError(error, desc)),
+                _ => Err(Error::UnknownError),
+            },
+        }
+    }
+
+    pub fn get_budget_periods(
+        &self,
+        access_token: &str,
+        budget_id: i64,
+    ) -> Result<Vec<BudgetPeriod>, Error> {
+        let user = match self.get_user_by_access_token(access_token)? {
+            Some(x) => x,
+            None => return Err(Error::InvalidCredentials),
+        };
+
+        let budget = match self.get_available_budget(access_token, budget_id)? {
+            Some(x) => x,
+            None => return Err(Error::InvalidCredentials),
+        };
+
+        let mut start_date: DateTime<FixedOffset> = from_sqlite_date(&budget.start_date)?;
+
+        let today: DateTime<FixedOffset> = DateTime::parse_from_rfc2822(&Utc::now().to_rfc2822())?;
+        let period_id = 0;
+
+        let mut res: Vec<BudgetPeriod> = Vec::new();
+        loop {
+            let end_date = start_date + Duration::days(budget.period_length);
+            let period = BudgetPeriod {
+                period_id,
+                start_date: to_sqlite_date(&start_date),
+                end_date: to_sqlite_date(&end_date),
+            };
+
+            res.insert(0, period);
+
+            start_date = end_date;
+
+            if start_date > today {
+                break;
+            }
+        }
+
+        Ok(res)
+    }
+
+    pub fn get_budget_period(
+        &self,
+        access_token: &str,
+        budget_id: i64,
+        period_id: i64
+    ) -> Result<Option<BudgetPeriod>, Error> {
+        let user = match self.get_user_by_access_token(access_token)? {
+            Some(x) => x,
+            None => return Err(Error::InvalidCredentials),
+        };
+
+        let budget = match self.get_available_budget(access_token, budget_id)? {
+            Some(x) => x,
+            None => return Err(Error::InvalidCredentials),
+        };
+
+        let mut start_date: DateTime<FixedOffset> = from_sqlite_date(&budget.start_date)?;
+
+        let today: DateTime<FixedOffset> = DateTime::parse_from_rfc2822(&Utc::now().to_rfc2822())?;
+
+        start_date = start_date + Duration::days(budget.period_length * period_id);
+        let end_date = start_date + Duration::days(period_id);
+
+        if start_date < from_sqlite_date(&budget.start_date)? {
+            Ok(None)
+        } else {
+            Ok(Some(BudgetPeriod {
+                period_id,
+                start_date: to_sqlite_date(&start_date),
+                end_date: to_sqlite_date(&end_date)
+            }))
+        }
+    }
+
+    pub fn get_budget_period_amount_spent(
+        &self,
+        access_token: &str,
+        budget_id: i64,
+        period_id: i64
+    ) -> Result<f64, Error> {
+        let user = match self.get_user_by_access_token(access_token)? {
+            Some(x) => x,
+            None => return Err(Error::InvalidCredentials),
+        };
+
+        let budget = match self.get_available_budget(access_token, budget_id)? {
+            Some(x) => x,
+            None => return Err(Error::InvalidCredentials),
+        };
+
+        let mut stmt = self.db_conn.prepare(
+            "SELECT SUM(amount) FROM transactions WHERE
+            budget_id = ?1 AND
+            date >= ?2 AND date <= ?3"
+        )?;
+
+        let period = match self.get_budget_period(access_token, budget_id, period_id)? {
+            Some(x) => x,
+            None => return Err(Error::EntryNotFound),
+        };
+
+        match stmt.query_row(params![budget_id, period.start_date, period.end_date], |row| {
+            let amount: f64 = row.get(0)?;
+            Ok(amount)
+        }) {
+            Ok(amount) => Ok(amount),
+            Err(_) => Ok(0.0)
+        }
+    }
+
+    pub fn get_current_budget_period(
+        &self,
+        access_token: &str,
+        budget_id: i64
+    ) -> Result<BudgetPeriod, Error> {
+        let user = match self.get_user_by_access_token(access_token)? {
+            Some(x) => x,
+            None => return Err(Error::InvalidCredentials),
+        };
+
+        let budget = match self.get_available_budget(access_token, budget_id)? {
+            Some(x) => x,
+            None => return Err(Error::InvalidCredentials),
+        };
+
+        let mut start_date: DateTime<FixedOffset> = from_sqlite_date(&budget.start_date)?;
+
+        let today: DateTime<FixedOffset> = DateTime::parse_from_rfc2822(&Utc::now().to_rfc2822())?;
+
+        let duration = start_date.signed_duration_since(today);
+
+        let period_id = duration.num_days() % budget.period_length;
+
+        let start_date = start_date + Duration::days(period_id * budget.period_length);
+        let end_date = start_date + Duration::days(budget.period_length);
+
+        Ok(BudgetPeriod {
+            period_id,
+            start_date: to_sqlite_date(&start_date),
+            end_date: to_sqlite_date(&end_date)
+        })
+    }
 }
 
 fn rollback(path: &str, error: Error) {
     // Do rollback
     println!("Error occurred while setting up database, rolling back changes...");
-    
     fs::remove_file(Path::new(path)).unwrap();
 
     panic!("Database setup failed:\n{:#?}", error);
@@ -598,16 +860,21 @@ pub struct User {
     pub last_name: String,
     pub password: String,
     pub access_token: String,
-    pub is_admin: bool
+    pub is_admin: bool,
 }
 
 impl User {
-    
     /// Constructs a new `User`
-    /// 
+    ///
     /// Note: The password field should be plaintext (it is hashed here)
-    pub fn new(database: &Database, email: &String, first_name: &String,
-        last_name: &String, password: &String, is_admin: bool) -> User {
+    pub fn new(
+        database: &Database,
+        email: &String,
+        first_name: &String,
+        last_name: &String,
+        password: &String,
+        is_admin: bool,
+    ) -> User {
         let hpassword = database.hash(password);
 
         let access_token = User::generate_access_token(database, email, &hpassword);
@@ -618,7 +885,7 @@ impl User {
             last_name: last_name.clone(),
             password: hpassword,
             access_token,
-            is_admin
+            is_admin,
         }
     }
 

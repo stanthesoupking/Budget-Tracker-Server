@@ -5,7 +5,9 @@ extern crate chrono;
 mod database;
 mod shared;
 mod budget;
+mod transaction;
 mod can_access_budget;
+mod budget_period;
 mod api;
 mod util;
 
@@ -16,7 +18,7 @@ use database::*;
 use std::sync::{Mutex};
 
 // Constants
-const BINDING: &str = "127.0.0.1:3000";
+const BINDING: &str = "10.0.0.1:3000";
 const DB_PATH: &str = "budget.db";
 
 // Shares database connection with all web server workers

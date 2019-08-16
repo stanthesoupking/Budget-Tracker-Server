@@ -49,7 +49,8 @@
                         </div>
                         <div class="form-group">
                             <label for="budget-start-date" class="col-form-label">Start Date:</label>
-                            <input class="form-control" data-date-format="dd/mm/yyyy" id="budget-start-date" data-date-end-date="0d">
+                            <input class="form-control" data-date-format="dd/mm/yyyy" id="budget-start-date"
+                                data-date-end-date="0d">
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -89,7 +90,7 @@
 
         let dateParts = $("#new-budget-modal-form #budget-start-date").val().split("/");
 
-        let budgetStartDate = dateParts[2] + '-' + dateParts[1] + '-' +dateParts[0];
+        let budgetStartDate = dateParts[2] + '-' + dateParts[1] + '-' + dateParts[0];
 
         createBudget(accessToken, budgetName, budgetSpendLimit, budgetPeriodLength, budgetStartDate).done((data) => {
             if (data.status == "Success") {
@@ -112,11 +113,38 @@
 
                 card.find("#title").html(budget.name);
 
-                card.on("click", () => {
-                    window.location.hash = "transactions:" + budget.budget_id;
-                })
+                getCurrentBudgetPeriod(accessToken, budget.budget_id).done((data) => {
+                    if (data.status == "Success") {
+                        let period = data.budget_period;
+                        getBudgetSpent(accessToken, budget.budget_id, period.period_id).done((data) => {
+                            console.log(data);
 
-                $(".overview-budgets").append(card);
+                            let remaining = Number(budget.spend_limit - data.spent).toFixed(2);
+
+                            let percent = (remaining / budget.spend_limit) * 100.0;
+
+                            card.find("#subtitle").html(`$${remaining} funds remaining`);
+
+                            card.find("#bar-progress").prop("style", `width: ${percent}%`)
+
+                            if (percent < 15.0) {
+                                card.find("#bar-progress").addClass("bg-danger");
+                            } else if (percent < 30.0) {
+                                card.find("#bar-progress").addClass("bg-warning");
+                            } else {
+                                card.find("#bar-progress").addClass("bg-success");
+                            }
+
+                            card.on("click", () => {
+                                window.location.hash = "transactions:" + budget.budget_id;
+                            })
+
+                            $(".overview-budgets").append(card);
+                        });
+                    }
+                });
+
+
             }
         } else {
 

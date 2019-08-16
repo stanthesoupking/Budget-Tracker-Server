@@ -1,5 +1,6 @@
 use actix_web::{web, Responder, Scope};
 
+use crate::transaction::Transaction;
 use crate::budget::Budget;
 use crate::database::{User};
 use crate::shared::*;
@@ -16,9 +17,14 @@ pub fn get_service() -> Scope {
         .route("/add/budget", web::post().to(add_budget))
         .route("/delete/budget", web::post().to(delete_budget))
         .route("/get/budget", web::post().to(get_budget))
+        .route("/get/budget/spent", web::post().to(get_budget_spent))
+        .route("/get/budget/current_period", web::post().to(get_budget_current_period))
         .route("/list/can_access_budget", web::post().to(list_can_access_budget))
         .route("/add/can_access_budget", web::post().to(add_can_access_budget))
         .route("/delete/can_access_budget", web::post().to(delete_can_access_budget))
+        .route("/list/transactions", web::post().to(list_transactions))
+        .route("/add/transaction", web::post().to(add_transaction))
+        .route("/list/budget_periods", web::post().to(list_budget_periods))
 }
 
 // API Routes
@@ -215,6 +221,26 @@ fn get_budget(data: web::Data<AppState>, json: web::Json<SelectForm>) -> impl Re
     }
 }
 
+fn get_budget_spent(data: web::Data<AppState>, json: web::Json<BudgetPeriodForm>) -> impl Responder {
+    let database = data.database.lock().unwrap();
+
+    let res = database.get_budget_period_amount_spent(&json.access_token, json.budget_id, json.period_id);
+
+    match res {
+        Ok(spent) => web::Json(BudgetBalanceResult {
+            status: ResultStatus::Success,
+            spent: Some(spent)
+        }),
+        Err(error) => web::Json(BudgetBalanceResult {
+            status: ResultStatus::Error(String::from(format!(
+                "Error occurred getting budget: {:?}",
+                error
+            ))),
+            spent: None
+        }),
+    }
+}
+
 fn list_can_access_budget(data: web::Data<AppState>, json: web::Json<SelectForm>) -> impl Responder {
     let database = data.database.lock().unwrap();
 
@@ -268,6 +294,93 @@ fn delete_can_access_budget(data: web::Data<AppState>, json: web::Json<CanAccess
                 "Error occurred giving budget access: {:?}",
                 error
             )))
+        }),
+    }
+}
+
+fn list_transactions(data: web::Data<AppState>, json: web::Json<SelectForm>) -> impl Responder {
+    let database = data.database.lock().unwrap();
+
+    let transactions = database.get_budget_transactions(&json.access_token, json.id);
+
+    match transactions {
+        Ok(transactions) => web::Json(TransactionListResult {
+            status: ResultStatus::Success,
+            transactions: Some(transactions),
+        }),
+        Err(error) => web::Json(TransactionListResult {
+            status: ResultStatus::Error(String::from(format!(
+                "Error occurred while getting transactions: {:?}",
+                error
+            ))),
+            transactions: None,
+        }),
+    }
+}
+
+fn add_transaction(data: web::Data<AppState>, json: web::Json<AddTransactionForm>) -> impl Responder {
+    let database = data.database.lock().unwrap();
+
+    let res = database.add_transaction(&json.access_token, &Transaction::new(
+        json.budget_id,
+        json.transaction_name.clone(),
+        json.transaction_description.clone(),
+        json.transaction_amount,
+        json.transaction_recur_days.clone(),
+        json.transaction_recur_until.clone()
+    ));
+
+    match res {
+        Ok(transaction) => web::Json(TransactionResult {
+            status: ResultStatus::Success,
+            transaction: Some(transaction)
+        }),
+        Err(error) => web::Json(TransactionResult {
+            status: ResultStatus::Error(String::from(format!(
+                "Error occurred while creating transaction: {:?}",
+                error
+            ))),
+            transaction: None
+        }),
+    }
+}
+
+fn list_budget_periods(data: web::Data<AppState>, json: web::Json<SelectForm>) -> impl Responder {
+    let database = data.database.lock().unwrap();
+
+    let budget_periods = database.get_budget_periods(&json.access_token, json.id);
+
+    match budget_periods {
+        Ok(budget_periods) => web::Json(BudgetPeriodListResult {
+            status: ResultStatus::Success,
+            budget_periods: Some(budget_periods),
+        }),
+        Err(error) => web::Json(BudgetPeriodListResult {
+            status: ResultStatus::Error(String::from(format!(
+                "Error occurred while getting budget periods: {:?}",
+                error
+            ))),
+            budget_periods: None,
+        }),
+    }
+}
+
+fn get_budget_current_period(data: web::Data<AppState>, json: web::Json<SelectForm>) -> impl Responder {
+    let database = data.database.lock().unwrap();
+
+    let budget_period = database.get_current_budget_period(&json.access_token, json.id);
+
+    match budget_period {
+        Ok(budget_period) => web::Json(BudgetPeriodResult {
+            status: ResultStatus::Success,
+            budget_period: Some(budget_period),
+        }),
+        Err(error) => web::Json(BudgetPeriodResult {
+            status: ResultStatus::Error(String::from(format!(
+                "Error occurred while getting budget periods: {:?}",
+                error
+            ))),
+            budget_period: None,
         }),
     }
 }

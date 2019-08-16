@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::budget::*;
+use crate::budget_period::*;
+use crate::transaction::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ResultStatus {
@@ -92,4 +94,50 @@ pub struct UserListResult {
     pub users: Option<Vec<String>>
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TransactionListResult {
+    pub status: ResultStatus,
+    pub transactions: Option<Vec<Transaction>>
+}
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AddTransactionForm {
+    pub access_token: String,
+    pub budget_id: i64,
+    pub transaction_name: String,
+    pub transaction_description: String,
+    pub transaction_amount: f64,
+    pub transaction_recur_days: Option<i64>,
+    pub transaction_recur_until: Option<String>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TransactionResult {
+    pub status: ResultStatus,
+    pub transaction: Option<Transaction>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BudgetPeriodListResult {
+    pub status: ResultStatus,
+    pub budget_periods: Option<Vec<BudgetPeriod>>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BudgetPeriodForm {
+    pub access_token: String,
+    pub budget_id: i64,
+    pub period_id: i64
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BudgetBalanceResult {
+    pub status: ResultStatus,
+    pub spent: Option<f64>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BudgetPeriodResult {
+    pub status: ResultStatus,
+    pub budget_period: Option<BudgetPeriod>
+}
