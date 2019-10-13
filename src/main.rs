@@ -33,10 +33,6 @@ struct AppState {
     database: Mutex<Database>
 }
 
-fn index() -> impl Responder {
-    HttpResponse::Ok().body("Hello world!")
-}
-
 fn main() {
     let secret = String::from("Ks&#j%1_7,~");
 
@@ -72,7 +68,6 @@ fn main() {
                     .index_file("index.html")
             )
             .register_data(state.clone())
-            .route("/", web::get().to(index))
     })
     .bind_ssl(BINDING, builder)
     .unwrap()
