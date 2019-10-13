@@ -341,11 +341,14 @@ function niceDate(date) {
     let minute = date.getMinutes();
 
     if (seconds < 60) {
-        return `${seconds.toFixed(0)} seconds ago`
+        s = ((seconds.toFixed(0) != 1)? 's' : '');
+        return `${seconds.toFixed(0)} second${s} ago`
     } else if (minutes < 60) {
-        return `${minutes.toFixed(0)} minutes ago`
+        s = ((minutes.toFixed(0) != 1)? 's' : '');
+        return `${minutes.toFixed(0)} minute${s} ago`
     } else if ((hours < 24) && is_today) {
-        return `${hours.toFixed(0)} hours ago`
+        s = ((hours.toFixed(0) != 1)? 's' : '');
+        return `${hours.toFixed(0)} hour${s} ago`
     } else if (was_yesterday) {
         return `${hour}:${minute} ${am_pm}, Yesterday`
     } else {
