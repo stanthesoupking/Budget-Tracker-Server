@@ -120,3 +120,9 @@ body {
 .date-input {
   
 }
+.progress-bar-negative {
+  box-shadow: 0 0 0 2pt rgba(255, 0, 0, 1.0);
+  animation: blinker 1s linear infinite alternate;  
+}
+
+@keyframes blinker { to { background: rgb(252, 161, 161); } }

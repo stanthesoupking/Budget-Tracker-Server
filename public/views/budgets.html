@@ -117,23 +117,13 @@
                     if (data.status == "Success") {
                         let period = data.budget_period;
                         getBudgetSpent(accessToken, budget.budget_id, period.period_id).done((data) => {
-                            console.log(data);
-
                             let remaining = Number(budget.spend_limit - data.spent).toFixed(2);
 
                             let percent = (remaining / budget.spend_limit) * 100.0;
 
                             card.find("#subtitle").html(`$${remaining} funds remaining`);
 
-                            card.find("#bar-progress").prop("style", `width: ${percent}%`)
-
-                            if (percent < 15.0) {
-                                card.find("#bar-progress").addClass("bg-danger");
-                            } else if (percent < 30.0) {
-                                card.find("#bar-progress").addClass("bg-warning");
-                            } else {
-                                card.find("#bar-progress").addClass("bg-success");
-                            }
+                            setBar(card.find("#bar-progress"), percent);
 
                             card.on("click", () => {
                                 window.location.hash = "transactions:" + budget.budget_id;

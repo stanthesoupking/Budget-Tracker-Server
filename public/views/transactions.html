@@ -33,11 +33,43 @@
         <div class="tab-content" id="pills-tabContent">
             <div class="tab-pane fade show active" id="pills-transactions" role="tabpanel"
                 aria-labelledby="pills-transactions-tab">
-                <button class="btn btn-success" data-toggle="modal" data-target="#add-transaction-modal">
-                    Add Transaction
-                </button>
-                <div id="transactions" class="transactions mt-3">
-                    Loading...
+                <div id="transactions" class="transactions">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-sm mt-2">
+                                    <h5>Budget balance</h5>
+                                </div>
+                                <div class="col-sm text-right">
+                                    <div class="dropdown">
+
+                                        <button id="period-button" class="btn btn-light dropdown-toggle" type="button"
+                                            data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                            Period
+                                        </button>
+                                        <div id="period-button-dropdown" class="dropdown-menu"
+                                            aria-labelledby="period-button">
+                                            <a class="dropdown-item active" href="#">Current Period</a>
+                                            <a class="dropdown-item" href="#">Another action</a>
+                                            <a class="dropdown-item" href="#">Something else here</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="spent-amount"></div>
+
+                            <div id="bar" class="progress mb-1 mt-2">
+                                <div id="spent-bar" class="progress-bar" role="progressbar" style="width: 100%"
+                                    aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-success" data-toggle="modal" data-target="#add-transaction-modal">
+                        Add Transaction
+                    </button>
+                    <ul id="current-transactions-list" class="list-group mt-3 pb-3">
+
+                    </ul>
                 </div>
             </div>
             <div class="tab-pane fade" id="pills-share" role="tabpanel" aria-labelledby="pills-share-tab">
@@ -125,201 +157,279 @@
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Add User Modal -->
-        <div class="modal fade" id="add-user-modal" tabindex="-1" role="dialog" aria-labelledby="add-user-modal-title"
-            aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered" role="document">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="add-user-modal-title">Add User to Budget</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="form-group">
-                            <label for="add-user-modal-email-input" class="col-form-label">Email:</label>
-                            <input type="email" class="form-control" id="add-user-modal-email-input" required>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">
-                            Cancel
-                        </button>
-                        <button id="add-user-modal-add-button" type="button" class="btn btn-primary"
-                            data-dismiss="modal">
-                            Add
-                        </button>
+    <!-- Add User Modal -->
+    <div class="modal fade" id="add-user-modal" tabindex="-1" role="dialog" aria-labelledby="add-user-modal-title"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="add-user-modal-title">Add User to Budget</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="add-user-modal-email-input" class="col-form-label">Email:</label>
+                        <input type="email" class="form-control" id="add-user-modal-email-input" required>
                     </div>
                 </div>
-            </div>
-
-            <!-- Delete Confirmation Modal -->
-            <div class="modal fade" id="delete-budget-modal" tabindex="-1" role="dialog"
-                aria-labelledby="delete-budget-modal-title" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered" role="document">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="delete-budget-modal-title">Delete Budget</h5>
-                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div>
-                        <div class="modal-body">
-                            This action cannot be undone, are you sure you wish to continue?
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-dismiss="modal">
-                                Cancel
-                            </button>
-                            <button id="delete-button" type="button" class="btn btn-danger" data-dismiss="modal">
-                                Delete
-                            </button>
-                        </div>
-                    </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                        Cancel
+                    </button>
+                    <button id="add-user-modal-add-button" type="button" class="btn btn-primary" data-dismiss="modal">
+                        Add
+                    </button>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <script>
-                budgetID = stateData;
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="delete-budget-modal" tabindex="-1" role="dialog"
+        aria-labelledby="delete-budget-modal-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="delete-budget-modal-title">Delete Budget</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    This action cannot be undone, are you sure you wish to continue?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                        Cancel
+                    </button>
+                    <button id="delete-button" type="button" class="btn btn-danger" data-dismiss="modal">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                $('#add-transaction-modal-recur-until-date').datepicker({
-                    weekStart: 1,
-                    autoclose: true
-                });
+    <script>
+        budgetID = /^(\d+).*$/.exec(stateData)[1];
 
-                $("#add-transaction-modal-recur-check").change(() => {
-                    $("#add-transaction-modal-recur-inputs").toggle();
-                });
+        // Get period ID
+        temp = /^(\d+)\-(\d+).*$/.exec(stateData);
+        if (temp)
+            periodID = temp[2];
+        else
+            // Get current period after budget has been loaded
+            periodID = undefined;
 
-                $("#add-transaction-modal-recur-forever-check").change(() => {
-                    $("#add-transaction-modal-recur-until-inputs").toggle();
-                });
+        $('#add-transaction-modal-recur-until-date').datepicker({
+            weekStart: 1,
+            autoclose: true
+        });
 
-                getBudget(accessToken, budgetID).done((data) => {
-                    if ((data.status = "Success") && (data.budget)) {
-                        budget = data.budget;
-                        $("#title").html(budget.name);
+        $("#add-transaction-modal-recur-check").change(() => {
+            $("#add-transaction-modal-recur-inputs").toggle();
+        });
 
-                        // Get transactions
-                        getBudgetTransactions(accessToken, budgetID).done((data) => {
-                            if ((data.status = "Success") && (data.transactions)) {
-                                $("#transactions").html("");
-                                let transactionList = $("#transactions").append('<ul class="list-group"></ul>');
-                                for (let transaction of data.transactions) {
-                                    let amount_text;
-                                    let color;
-                                    if (transaction.amount > 0) {
-                                        color = 'red';
-                                        amount_text = '- $' + transaction.amount.toFixed(2);
-                                    } else {
-                                        color = 'green';
-                                        amount_text = '+ $' + (transaction.amount * -1).toFixed(2);
-                                    }
-                                    let text = `<b class="${color}">${amount_text}</b>&nbsp&nbsp&nbsp<b>${transaction.name}</b>
-                                    - <i>${transaction.date}</i>`;
-                                    transactionList.append(`<li class="list-group-item">${text}</li>`);
+        $("#add-transaction-modal-recur-forever-check").change(() => {
+            $("#add-transaction-modal-recur-until-inputs").toggle();
+        });
+
+        getBudget(accessToken, budgetID).done((data) => {
+            if ((data.status = "Success") && (data.budget)) {
+                budget = data.budget;
+                $("#title").html(budget.name);
+
+                // Function which is called after the period is loaded
+                let foo = (period) => {
+                    if (period.period_id == currentPeriod.period_id)
+                        $("#period-button").html(`<b>Current Period</b>`);
+                    else
+                        $("#period-button").html(`<b>${localDateString(period.start_date)}</b> to <b>${localDateString(period.end_date)}</b>`);
+
+                    $("#period-button").on("click", () => {
+                        $("#period-button-dropdown").html("loading...");
+                        getBudgetPeriods(accessToken, budget.budget_id).done((data) => {
+                            if (data.status == "Success") {
+                                $("#period-button-dropdown").html("");
+                                for (let period of data.budget_periods) {
+                                    let active = ((period.period_id == periodID)) ? " active" : "";
+                                    $("#period-button-dropdown").append(`
+                                            <a class="dropdown-item${active}" href="#transactions:${budgetID}-${period.period_id}"><b>${localDateString(period.start_date)}</b> to <b>${localDateString(period.end_date)}</b></a>
+                                        `);
                                 }
-
-                            } else {
-                                displayToast('transactions-get-fail');
-                                location.hash = '#budgets';
                             }
                         });
+                    })
 
-                        // Get shared with
-                        getSharedWith(accessToken, budgetID).done((data) => {
-                            if ((data.status = "Success") && (data.users)) {
-                                $("#transaction-list").html("");
-                                for (let user of data.users) {
-                                    let text = user;
-                                    if (user == budget.owner) {
-                                        text = text + ' (owner)';
-                                    } else {
-                                        text = text + ` <button class="btn btn-danger ml-3" onclick="removeUser('${user}')">Remove</button>`;
-                                    }
-                                    $("#shared-with-list").append(`<li class="list-group-item">${text}</li>`);
-                                }
 
-                            } else {
-                                displayToast('transactions-get-fail');
-                                location.hash = '#budgets';
-                            }
-                        });
+                    // Get amount spent
+                    getBudgetSpent(accessToken, budgetID, period.period_id).done((data) => {
+                        if (data.status == "Success") {
+                            let remaining = Number(budget.spend_limit - data.spent).toFixed(2);
 
-                        // Setup delete button
-                        $("#delete-button").on("click", () => {
-                            deleteBudget(accessToken, budgetID).done((data) => {
-                                if (data.status == "Success") {
-                                    displayToast("budget-delete-success");
-                                    gotoView('budgets');
+                            let percent = (remaining / budget.spend_limit) * 100.0;
+
+                            setBar($("#spent-bar"), percent);
+
+                            $("#spent-amount").html(`$${remaining} funds remaining`);
+                        }
+                    });
+
+                    // Get transactions
+                    getBudgetTransactionsInPeriod(accessToken, budgetID, periodID).done((data) => {
+                        if ((data.status = "Success") && (data.transactions)) {
+                            let transactionList = $("#current-transactions-list");
+                            for (let transaction of data.transactions) {
+                                let amount_text;
+                                let color;
+                                if (transaction.amount > 0) {
+                                    color = 'red';
+                                    amount_text = '- $' + transaction.amount.toFixed(2);
                                 } else {
-                                    displayToast("budget-delete-fail");
+                                    color = 'green';
+                                    amount_text = '+ $' + (transaction.amount * -1).toFixed(2);
                                 }
-                            });
-                        });
 
-                        // Setup add user button
-                        $("#add-user-modal-add-button").on("click", () => {
-                            addUserToBudget(accessToken, $("#add-user-modal-email-input").val(), budgetID).done((data) => {
+                                let date = niceDate(fromSqliteDateTime(transaction.date));
+
+                                let text = `<b class="${color}">${amount_text}</b>&nbsp&nbsp&nbsp<b>${transaction.name}</b>
+                                    - <i>${date}</i>`;
+
+                                transactionList.append(`<li class="list-group-item">${text}</li>`);
+                            }
+
+                        } else {
+                            displayToast('transactions-get-fail');
+                            location.hash = '#budgets';
+                        }
+                    });
+
+                    // Get shared with
+                    getSharedWith(accessToken, budgetID).done((data) => {
+                        if ((data.status = "Success") && (data.users)) {
+                            $("#transaction-list").html("");
+                            for (let user of data.users) {
+                                let text = user;
+                                if (user == budget.owner) {
+                                    text = text + ' (owner)';
+                                } else {
+                                    text = text + ` <button class="btn btn-danger ml-3" onclick="removeUser('${user}')">Remove</button>`;
+                                }
+                                $("#shared-with-list").append(`<li class="list-group-item">${text}</li>`);
+                            }
+
+                        } else {
+                            displayToast('transactions-get-fail');
+                            location.hash = '#budgets';
+                        }
+                    });
+
+                    // Setup delete button
+                    $("#delete-button").on("click", () => {
+                        deleteBudget(accessToken, budgetID).done((data) => {
+                            if (data.status == "Success") {
+                                displayToast("budget-delete-success");
+                                gotoView('budgets');
+                            } else {
+                                displayToast("budget-delete-fail");
+                            }
+                        });
+                    });
+
+                    // Setup add user button
+                    $("#add-user-modal-add-button").on("click", () => {
+                        addUserToBudget(accessToken, $("#add-user-modal-email-input").val(), budgetID).done((data) => {
+                            if (data.status == "Success") {
+                                displayToast("add-user-success");
+                                reloadView();
+                            } else {
+                                displayToast("add-user-fail");
+                            }
+                        });
+                    });
+
+                    // Setup add transaction button
+                    $("#add-transaction-modal-add-button").on("click", () => {
+                        let transactionName = $("#add-transaction-modal-name-input").val();
+                        let transactionDescription = $("#add-transaction-modal-description-input").val();
+                        let transactionAmount = $("#add-transaction-modal-amount-input").val();
+
+                        let tranasctionRecurDays = null;
+                        let transactionRecurUntil = null;
+
+                        if ($("#add-transaction-modal-recur-check").is(":checked")) {
+                            tranasctionRecurDays = $("#add-transaction-modal-recur-every-input").val();
+                            if (!$("#add-transaction-modal-recur-forever-check").is(":checked")) {
+                                transactionRecurUntil = $("#add-transaction-modal-recur-until-date").val();
+                            }
+                        }
+
+                        addTransactionToBudget(accessToken, budgetID,
+                            transactionName, transactionDescription, transactionAmount,
+                            tranasctionRecurDays, transactionRecurUntil).done((data) => {
                                 if (data.status == "Success") {
-                                    displayToast("add-user-success");
+                                    displayToast("add-transaction-success");
                                     reloadView();
                                 } else {
-                                    displayToast("add-user-fail");
+                                    displayToast("add-transaction-fail");
                                 }
                             });
-                        });
+                    });
+                };
 
-                        // Setup add transaction button
-                        $("#add-transaction-modal-add-button").on("click", () => {
-                            let transactionName = $("#add-transaction-modal-name-input").val();
-                            let transactionDescription = $("#add-transaction-modal-description-input").val();
-                            let transactionAmount = $("#add-transaction-modal-amount-input").val();
-
-                            let tranasctionRecurDays = null;
-                            let transactionRecurUntil = null;
-
-                            if ($("#add-transaction-modal-recur-check").is(":checked")) {
-                                tranasctionRecurDays = $("#add-transaction-modal-recur-every-input").val();
-                                if (!$("#add-transaction-modal-recur-forever-check").is(":checked")) {
-                                    transactionRecurUntil = $("#add-transaction-modal-recur-until-date").val();
+                // Get current period
+                getCurrentBudgetPeriod(accessToken, budget.budget_id).done((data) => {
+                    if (data.status == "Success") {
+                        currentPeriod = data.budget_period;
+                        // Load budget period
+                        if (periodID == undefined) {
+                            // Use current period
+                            period = currentPeriod;
+                            periodID = currentPeriod.period_id;
+                            foo(period);
+                        } else {
+                            getBudgetPeriod(accessToken, budget.budget_id, periodID).done((data) => {
+                                if (data.status == "Success") {
+                                    period = data.budget_period;
+                                    foo(period);
                                 }
-                            }
-
-                            addTransactionToBudget(accessToken, budgetID,
-                                transactionName, transactionDescription, transactionAmount,
-                                tranasctionRecurDays, transactionRecurUntil).done((data) => {
-                                    if (data.status == "Success") {
-                                        displayToast("add-transaction-success");
-                                        reloadView();
-                                    } else {
-                                        displayToast("add-transaction-fail");
-                                    }
-                                });
-                        });
-
-                    } else {
+                                else {
+                                    displayToast('transactions-get-fail');
+                                    location.hash = '#budgets';
+                                }
+                            });
+                        }
+                    }
+                    else {
                         displayToast('transactions-get-fail');
                         location.hash = '#budgets';
                     }
                 });
 
-                $("#logoutButton").on("click", () => {
-                    clearAccessTokenCookie();
-                    gotoView('login');
-                });
+            } else {
+                displayToast('transactions-get-fail');
+                location.hash = '#budgets';
+            }
+        });
 
-                function removeUser(email) {
-                    removeUserFromBudget(accessToken, email, budgetID).done((data) => {
-                        if (data.status == "Success") {
-                            displayToast("remove-user-success");
-                            reloadView();
-                        } else {
-                            displayToast("remove-user-fail");
-                        }
-                    });
+        $("#logoutButton").on("click", () => {
+            clearAccessTokenCookie();
+            gotoView('login');
+        });
+
+        function removeUser(email) {
+            removeUserFromBudget(accessToken, email, budgetID).done((data) => {
+                if (data.status == "Success") {
+                    displayToast("remove-user-success");
+                    reloadView();
+                } else {
+                    displayToast("remove-user-fail");
                 }
-            </script>
-        </div>
+            });
+        }
+    </script>
+</div>

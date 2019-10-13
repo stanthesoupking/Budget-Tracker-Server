@@ -18,7 +18,7 @@ use database::*;
 use std::sync::{Mutex};
 
 // Constants
-const BINDING: &str = "10.0.0.1:3000";
+const BINDING: &str = "localhost:3000";
 const DB_PATH: &str = "budget.db";
 
 // Shares database connection with all web server workers

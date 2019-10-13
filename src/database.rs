@@ -150,7 +150,7 @@ impl Database {
                 name TEXT NOT NULL,
                 spend_limit FLOAT NOT NULL,
                 period_length INTEGER NOT NULL,
-                start_date DATE NOT NULL,
+                start_date TEXT NOT NULL,
                 FOREIGN KEY(owner) REFERENCES users(email)
             );
 
@@ -168,10 +168,10 @@ impl Database {
                 email TEXT NOT NULL,
                 name TEXT NOT NULL,
                 description TEXT NOT NULL,
-                date DATE NOT NULL,
+                date TEXT NOT NULL,
                 amount FLOAT NOT NULL,
                 recur_days INTEGER NOT NULL,
-                recur_until DATE,
+                recur_until TEXT,
                 FOREIGN KEY(budget_id) REFERENCES budgets(budget_id)
                 FOREIGN KEY(email) REFERENCES users(email)
             );
@@ -633,14 +633,54 @@ impl Database {
         Ok(result)
     }
 
-    // pub fn get_budget_transactions_in_period(
-    //     &self,
-    //     access_token: &str,
-    //     budget_id: i64,
-    //     period_id: i64
-    // ) -> Result<Vec<Transaction>, Error> {
-        
-    // }
+    pub fn get_budget_transactions_in_period(
+        &self,
+        access_token: &str,
+        budget_id: i64,
+        period_id: i64,
+    ) -> Result<Vec<Transaction>, Error> {
+        let user = match self.get_user_by_access_token(access_token)? {
+            Some(x) => x,
+            None => return Err(Error::InvalidCredentials),
+        };
+        let budget = match self.get_available_budget(access_token, budget_id)? {
+            Some(x) => x,
+            None => return Err(Error::EntryNotFound),
+        };
+
+        // Get period
+        let period = match self.get_budget_period(access_token, budget_id, period_id)? {
+            Some(x) => x,
+            None => return Err(Error::EntryNotFound)
+        };
+
+        let mut stmt = self.db_conn.prepare(
+            "SELECT transaction_id, budget_id, email, name, description, date, amount, recur_days,
+            recur_until FROM transactions WHERE budget_id = ?1 AND date(date) >= date(?2) AND date(date) <= date(?3) ORDER BY date DESC",
+        )?;
+
+        let mut result: Vec<Transaction> = Vec::new();
+
+        let transaction_iter = stmt.query_map(params![budget_id, period.start_date, period.end_date], |row| {
+            Ok(Transaction {
+                transaction_id: row.get(0)?,
+                budget_id: row.get(1)?,
+                email: row.get(2)?,
+                name: row.get(3)?,
+                description: row.get(4)?,
+                date: row.get(5)?,
+                amount: row.get(6)?,
+                recur_days: row.get(7)?,
+                recur_until: row.get(8)?,
+            })
+        });
+
+        for transaction in transaction_iter? {
+            result.push(transaction?);
+        }
+
+        Ok(result)
+    }
 
     pub fn add_transaction(
         &self,
@@ -654,7 +694,7 @@ impl Database {
 
         let date = match &transaction.date {
             Some(x) => x.clone(),
-            None => get_current_date(),
+            None => get_current_date_time(),
         };
 
         // TODO: verify that the current user has access to this budget
@@ -716,11 +756,11 @@ impl Database {
         let mut start_date: DateTime<FixedOffset> = from_sqlite_date(&budget.start_date)?;
 
         let today: DateTime<FixedOffset> = DateTime::parse_from_rfc2822(&Utc::now().to_rfc2822())?;
-        let period_id = 0;
+        let mut period_id: i64 = 0;
 
         let mut res: Vec<BudgetPeriod> = Vec::new();
         loop {
-            let end_date = start_date + Duration::days(budget.period_length);
+            let end_date = start_date + Duration::days(budget.period_length - 1);
             let period = BudgetPeriod {
                 period_id,
                 start_date: to_sqlite_date(&start_date),
@@ -729,11 +769,13 @@ impl Database {
 
             res.insert(0, period);
 
-            start_date = end_date;
+            start_date = end_date + Duration::days(1);
 
             if start_date > today {
                 break;
             }
+
+            period_id += 1;
         }
 
         Ok(res)
@@ -757,10 +799,8 @@ impl Database {
 
         let mut start_date: DateTime<FixedOffset> = from_sqlite_date(&budget.start_date)?;
 
-        let today: DateTime<FixedOffset> = DateTime::parse_from_rfc2822(&Utc::now().to_rfc2822())?;
-
         start_date = start_date + Duration::days(budget.period_length * period_id);
-        let end_date = start_date + Duration::days(period_id);
+        let end_date = start_date + Duration::days(budget.period_length -1);
 
         if start_date < from_sqlite_date(&budget.start_date)? {
             Ok(None)
@@ -790,7 +830,7 @@ impl Database {
         };
 
         let mut stmt = self.db_conn.prepare(
-            "SELECT SUM(amount) FROM transactions WHERE
+            "SELECT SUM(amount), substr(date, 0, 11) FROM transactions WHERE
             budget_id = ?1 AND
             date >= ?2 AND date <= ?3"
         )?;
@@ -824,16 +864,16 @@ impl Database {
             None => return Err(Error::InvalidCredentials),
         };
 
-        let mut start_date: DateTime<FixedOffset> = from_sqlite_date(&budget.start_date)?;
+        let start_date: DateTime<FixedOffset> = from_sqlite_date(&budget.start_date)?;
 
-        let today: DateTime<FixedOffset> = DateTime::parse_from_rfc2822(&Utc::now().to_rfc2822())?;
+        let today: DateTime<FixedOffset> = get_now();
 
-        let duration = start_date.signed_duration_since(today);
+        let duration = today.signed_duration_since(start_date);
 
-        let period_id = duration.num_days() % budget.period_length;
+        let period_id = duration.num_days() / budget.period_length;
 
         let start_date = start_date + Duration::days(period_id * budget.period_length);
-        let end_date = start_date + Duration::days(budget.period_length);
+        let end_date = start_date + Duration::days(budget.period_length - 1);
 
         Ok(BudgetPeriod {
             period_id,

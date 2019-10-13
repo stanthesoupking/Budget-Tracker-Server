@@ -198,8 +198,20 @@ function getBudgetTransactions(access_token, budgetID) {
     });
 }
 
+function getBudgetTransactionsInPeriod(access_token, budgetID, periodID) {
+    return $.ajax("api/list/transactions/period", {
+        data: JSON.stringify({
+            access_token,
+            budget_id: Number(budgetID),
+            period_id: Number(periodID)
+        }),
+        type: 'POST',
+        contentType: 'application/json'
+    });
+}
+
 function getBudgetPeriods(access_token, budgetID) {
-    return $.ajax("api/get/budget_periods", {
+    return $.ajax("api/list/budget_periods", {
         data: JSON.stringify({
             access_token,
             id: Number(budgetID)
@@ -218,6 +230,18 @@ function getCurrentBudgetPeriod(access_token, budgetID) {
         }),
         type: 'POST',
         contentType: 'application/json'
+    }); 
+}
+
+function getBudgetPeriod(access_token, budgetID, periodID) {
+    return $.ajax("api/get/budget/period", {
+        data: JSON.stringify({
+            access_token,
+            budget_id: Number(budgetID),
+            period_id: Number(periodID),
+        }),
+        type: 'POST',
+        contentType: 'application/json'
     });
 }
 
@@ -231,4 +255,116 @@ function getBudgetSpent(access_token, budgetID, periodID) {
         type: 'POST',
         contentType: 'application/json'
     });
+}
+
+function fromSqliteDate(sdate) {
+
+    let dparts = sdate.split("-").map(x => Number(x));
+
+    return new Date(year = dparts[0], monthIndex = dparts[1]-1, date = dparts[2],
+        hours = 0, minutes = 0, seconds = 0);
+}
+
+function fromSqliteDateTime(sdate) {
+    let sparts = sdate.split(" ");
+
+    let dparts = sparts[0].split("-").map(x => Number(x));
+    let tparts = sparts[1].split(":").map(x => Number(x));
+
+    let d = new Date(year = dparts[0], monthIndex = dparts[1]-1, date = dparts[2],
+        hours = tparts[0], minutes = tparts[1], seconds = tparts[2]);
+
+    return d;
+}
+
+function toNiceDay(day) {
+    let days_of_week = [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday"
+    ];
+
+    return days_of_week[day % 7];
+}
+
+function toNiceMonth(month) {
+    let months = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "Novemenber",
+        "December"
+    ];
+
+    return months[month % 12];
+}
+
+function localDateString(date) {
+    date = new Date(date);
+    return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+}
+
+function niceDate(date) {
+    let now = new Date();
+
+    let seconds = (now - date)/1000;
+    let minutes = seconds/60;
+    let hours = minutes/60;
+
+    let is_today = (date.getDate() == now.getDate() && hours < 24);
+    let was_yesterday = (date.getDate() == (now.getDate() - 1)) && hours < 48;
+
+    // TODO: Allow for choice of either 24 or 12 hour time
+
+    let hour = date.getHours();
+    let am_pm = (hour < 12)? 'am' : 'pm';
+    
+    if (hour > 12) {
+        hour = hour - 12;
+    }
+
+    if (hour == 0) {
+        hour = 12;
+    }
+
+    let minute = date.getMinutes();
+
+    if (seconds < 60) {
+        return `${seconds.toFixed(0)} seconds ago`
+    } else if (minutes < 60) {
+        return `${minutes.toFixed(0)} minutes ago`
+    } else if ((hours < 24) && is_today) {
+        return `${hours.toFixed(0)} hours ago`
+    } else if (was_yesterday) {
+        return `${hour}:${minute} ${am_pm}, Yesterday`
+    } else {
+        return `${hour}:${minute} ${am_pm}, ${toNiceDay(date.getDay())}, ${date.getDate()} ${toNiceMonth(date.getMonth())} ${date.getFullYear()}`;
+    }
+}
+
+function setBar(bar, percent) {
+    bar.prop("style", `width: ${percent}%`)
+
+    if(percent < 0) {
+        bar.parent().addClass("progress-bar-negative");
+    }
+
+    if (percent < 15.0) {
+        bar.addClass("bg-danger");
+    } else if (percent < 30.0) {
+        bar.addClass("bg-warning");
+    } else {
+        bar.addClass("bg-success");
+    }
 }
