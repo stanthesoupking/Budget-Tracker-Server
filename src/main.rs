@@ -12,6 +12,7 @@ mod api;
 mod util;
 
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 
 use database::*;
 
@@ -20,6 +21,12 @@ use std::sync::{Mutex};
 // Constants
 const BINDING: &str = "localhost:3000";
 const DB_PATH: &str = "budget.db";
+
+// Path to private key and certificate generated using:
+//      openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem \
+//          -days 365 -sha256 -subj "<subject here>"
+const SSL_PRIVATE_KEY: &str = "";
+const SSL_CERT: &str = "";
 
 // Shares database connection with all web server workers
 struct AppState {
@@ -47,7 +54,16 @@ fn main() {
         database: Mutex::new(database)
     });
 
-    println!("Starting HTTP server using address \"{}\"...", BINDING);
+    println!("Loading SSL keys...");
+    let mut builder =
+        SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
+
+    builder
+        .set_private_key_file(SSL_PRIVATE_KEY, SslFiletype::PEM)
+        .unwrap();
+    builder.set_certificate_chain_file(SSL_CERT).unwrap();
+
+    println!("Starting HTTPS server using address \"{}\"...", BINDING);
     HttpServer::new(move || {
         App::new()
             .service(api::get_service())
@@ -58,7 +74,7 @@ fn main() {
             .register_data(state.clone())
             .route("/", web::get().to(index))
     })
-    .bind(BINDING)
+    .bind_ssl(BINDING, builder)
     .unwrap()
     .run()
     .unwrap();
