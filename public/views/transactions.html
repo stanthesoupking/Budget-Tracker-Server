@@ -57,6 +57,7 @@
                                 </div>
                             </div>
                             <div id="spent-amount"></div>
+                            <div id="days-remain">x day(s) until next period</div>
 
                             <div id="bar" class="progress mb-1 mt-2">
                                 <div id="spent-bar" class="progress-bar" role="progressbar" style="width: 100%"
@@ -245,10 +246,16 @@
 
                 // Function which is called after the period is loaded
                 let foo = (period) => {
-                    if (period.period_id == currentPeriod.period_id)
-                        $("#period-button").html(`<b>Current Period</b>`);
-                    else
+                    if (period.period_id == currentPeriod.period_id) {
+                        let endDate = new Date(period.end_date);
+                        let curDate = new Date();
+                        let days = Math.ceil((endDate.getTime() - curDate.getTime()) / 86400000) - 1;
+                        $("#period-button").html(`<b>Current Period</b>`);  
+                        $("#days-remain").html(`${days} day(s) until next period`);
+                    } else {
                         $("#period-button").html(`<b>${localDateString(period.start_date)}</b> to <b>${localDateString(period.end_date)}</b>`);
+                        $("#days-remain").html("");
+                    }
 
                     $("#period-button").on("click", () => {
                         $("#period-button-dropdown").html("loading...");
@@ -264,7 +271,6 @@
                             }
                         });
                     })
-
 
                     // Get amount spent
                     getBudgetSpent(accessToken, budgetID, period.period_id).done((data) => {
