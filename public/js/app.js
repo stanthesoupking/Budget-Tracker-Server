@@ -48,14 +48,27 @@ function getAccessTokenFromCookies() {
     let match = document.cookie.match(/access_token="(.*)"/);
 
     if ((match != null) && (match.length >= 2)) {
-        return match[1];
+        let accessToken = match[1];
+
+        // Update cookie to reset expiry date
+        setAccessTokenCookie(accessToken);
+
+        return accessToken;
     } else {
         return null;
     }
 }
 
 function setAccessTokenCookie(accessToken) {
-    document.cookie = `access_token="${accessToken}"`;
+    // Store for 14 days
+    let days = 14;
+
+    // Calculate expiry date
+    let d = new Date();
+    d.setTime(d.getTime() + (days * 86400000));
+
+    // Set cookie
+    document.cookie = `access_token="${accessToken}"; expires=${d.toUTCString()}`;
 }
 
 function clearAccessTokenCookie() {
