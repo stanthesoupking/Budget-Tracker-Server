@@ -37,15 +37,15 @@
                     <div class="card mb-3">
                         <div class="card-body">
                             <div class="row">
-                                <div class="col-sm mt-2">
+                                <div class="col mt-2" style="min-width: 4.5cm;">
                                     <h5>Budget balance</h5>
                                 </div>
-                                <div class="col-sm text-right">
+                                <div class="col text-right">
                                     <div class="dropdown">
-
-                                        <button id="period-button" class="btn btn-light dropdown-toggle" type="button"
+                                        <button id="period-button" class="btn btn-light" type="button"
                                             data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                            Period
+                                            <span id="period-button-content" class="d-none d-sm-block">Period</span>
+                                            <span class="d-block d-sm-none"><img src="svg/vert_overflow.svg"></span>
                                         </button>
                                         <div id="period-button-dropdown" class="dropdown-menu"
                                             aria-labelledby="period-button">
@@ -250,10 +250,10 @@
                         let endDate = new Date(period.end_date);
                         let curDate = new Date();
                         let days = Math.ceil((endDate.getTime() - curDate.getTime()) / 86400000) - 1;
-                        $("#period-button").html(`<b>Current Period</b>`);  
+                        $("#period-button-content").html(`<b>Current Period</b>`);  
                         $("#days-remain").html(`${days} day(s) until next period`);
                     } else {
-                        $("#period-button").html(`<b>${localDateString(period.start_date)}</b> to <b>${localDateString(period.end_date)}</b>`);
+                        $("#period-button-content").html(`<b>${localDateString(period.start_date)}</b> to <b>${localDateString(period.end_date)}</b>`);
                         $("#days-remain").html("");
                     }
 
