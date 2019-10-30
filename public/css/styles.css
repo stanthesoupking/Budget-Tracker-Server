@@ -125,4 +125,26 @@ body {
   animation: blinker 1s linear infinite alternate;  
 }
 
+#current-transactions .card-body {
+  padding: 0;
+}
+
+.transaction-table {
+  margin: 0;
+  padding: 0;
+  table-layout: fixed;
+}
+
+.transaction-table td, th {
+  text-align: left;
+}
+
+.transaction-table th {
+  padding: .75rem 1.25rem;
+}
+
+.transaction-table thead,tbody tr:not(:last-of-type) {
+  border-bottom: 1px solid rgba(0,0,0,0.125);
+}
+
 @keyframes blinker { to { background: rgb(252, 161, 161); } }

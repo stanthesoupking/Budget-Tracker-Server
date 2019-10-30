@@ -68,6 +68,28 @@
                     <button class="btn btn-success" data-toggle="modal" data-target="#add-transaction-modal">
                         Add Transaction
                     </button>
+                    <div id="current-transactions">
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <table class="table table-hover table-borderless transaction-table">
+                                    <colgroup>
+                                        <col style="width:3cm">
+                                        <col style="width:30%">
+                                        <col style="width:20%">
+                                    </colgroup>
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Cost</th>
+                                            <th scope="col">Name</th>
+                                            <th scope="col">Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="current-transactions-entries">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                     <ul id="current-transactions-list" class="list-group mt-3 pb-3">
 
                     </ul>
@@ -103,7 +125,8 @@
                 </div>
                 <div class="modal-body">
                     <div class="form-group">
-                        <label for="add-transaction-modal-name-input" class="col-form-label">Transaction Name:</label>
+                        <label for="add-transaction-modal-name-input" class="col-form-label">Transaction
+                            Name:</label>
                         <input type="text" class="form-control" id="add-transaction-modal-name-input" required>
                     </div>
                     <div class="form-group">
@@ -127,7 +150,8 @@
                     </div>
                     <div id="add-transaction-modal-recur-inputs" style="display: none">
                         <div class="form-group">
-                            <label for="add-transaction-modal-recur-every-input" class="col-form-label">Recur every X
+                            <label for="add-transaction-modal-recur-every-input" class="col-form-label">Recur every
+                                X
                                 days:</label>
                             <input type="number" class="form-control" id="add-transaction-modal-recur-every-input"
                                 min="1">
@@ -250,7 +274,7 @@
                         let endDate = new Date(period.end_date);
                         let curDate = new Date();
                         let days = Math.ceil((endDate.getTime() - curDate.getTime()) / 86400000) - 1;
-                        $("#period-button-content").html(`<b>Current Period</b>`);  
+                        $("#period-button-content").html(`<b>Current Period</b>`);
                         $("#days-remain").html(`${days} day(s) until next period`);
                     } else {
                         $("#period-button-content").html(`<b>${localDateString(period.start_date)}</b> to <b>${localDateString(period.end_date)}</b>`);
@@ -288,7 +312,7 @@
                     // Get transactions
                     getBudgetTransactionsInPeriod(accessToken, budgetID, periodID).done((data) => {
                         if ((data.status = "Success") && (data.transactions)) {
-                            let transactionList = $("#current-transactions-list");
+                            let transactionList = $("#current-transactions-entries");
                             for (let transaction of data.transactions) {
                                 let amount_text;
                                 let color;
@@ -302,10 +326,10 @@
 
                                 let date = niceDate(fromSqliteDateTime(transaction.date));
 
-                                let text = `<b class="${color}">${amount_text}</b>&nbsp&nbsp&nbsp<b>${transaction.name}</b>
-                                    - <i>${date}</i>`;
+                                let text = `<th class="${color}">${amount_text}</th><th>${transaction.name}</th>
+                                    <th>${date}</th>`;
 
-                                transactionList.append(`<li class="list-group-item">${text}</li>`);
+                                transactionList.append(`<tr>${text}</tr>`);
                             }
 
                         } else {
